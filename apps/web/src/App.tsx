@@ -1366,7 +1366,7 @@ function TableObjects({
         aria-pressed={selected === "discard"}
       >
         <span className="pile-art discard-pile" aria-hidden="true">
-          {topDiscard ? <MiniCard card={topDiscard} /> : <span className="empty-pile" />}
+          {topDiscard ? <PileTopCard card={topDiscard} /> : <span className="empty-pile" />}
         </span>
         <span className="pile-copy">
           <strong>Discard</strong>
@@ -2096,7 +2096,19 @@ function MiniCard({ card }: { card: Card }) {
       title={`${formatShape(card.shape)} ${card.rank} ${formatPattern(card.pattern)}`}
     >
       <ShapeIcon shape={card.shape} pattern={card.pattern} />
-      <span>{card.rank}</span>
+      <span className="mini-rank">{card.rank}</span>
+    </div>
+  );
+}
+
+function PileTopCard({ card }: { card: Card }) {
+  return (
+    <div
+      className={`pile-top-card suit-${card.shape} pattern-${card.pattern}`}
+      title={`${formatShape(card.shape)} ${card.rank} ${formatPattern(card.pattern)}`}
+    >
+      <ShapeIcon shape={card.shape} pattern={card.pattern} />
+      <span className="pile-top-rank">{card.rank}</span>
     </div>
   );
 }

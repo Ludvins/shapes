@@ -157,33 +157,48 @@ h3 {
 }
 
 .status-strip {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border: 1px solid rgba(44, 51, 57, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 8px 24px rgba(36, 45, 52, 0.05);
 }
 
 .status-item {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
   min-width: 0;
-  padding: 7px 10px;
+  padding: 4px 7px;
   border: 1px solid rgba(44, 51, 57, 0.14);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 8px 22px rgba(36, 45, 52, 0.05);
+  box-shadow: none;
 }
 
 .status-item span {
   display: block;
+  overflow: hidden;
   color: var(--muted);
-  font-size: 0.64rem;
+  font-size: 0.56rem;
   font-weight: 850;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .status-item strong {
   display: block;
   overflow: hidden;
-  margin-top: 2px;
-  font-size: 0.98rem;
+  font-size: 0.84rem;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -678,9 +693,56 @@ h3 {
   transform: translate(6px, -4px) rotate(9deg);
 }
 
-.discard-pile .mini-card {
-  min-width: 24px;
-  min-height: 28px;
+.pile-top-card {
+  --suit: var(--blue);
+  --suit-soft: #e4efff;
+  position: relative;
+  display: grid;
+  width: 24px;
+  height: 31px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(32, 36, 42, 0.36);
+  border-radius: 6px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(246, 249, 250, 0.97)),
+    #ffffff;
+  box-shadow:
+    inset 0 0 0 2px var(--suit-soft),
+    0 5px 10px rgba(0, 0, 0, 0.16);
+  color: var(--suit);
+}
+
+.pile-top-card::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(32, 36, 42, 0.08);
+  border-radius: 4px;
+}
+
+.pile-top-card .shape-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.pile-top-rank {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  min-width: 11px;
+  height: 11px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--suit);
+  font-size: 0.46rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.discard-pile .pile-top-card {
   transform: rotate(4deg);
 }
 
@@ -977,8 +1039,17 @@ h3 {
 }
 
 .draft-section {
-  width: min(100%, 590px);
+  justify-self: center;
+  width: max-content;
+  max-width: 100%;
   margin: 0 auto;
+  padding: 8px 10px 9px;
+}
+
+.draft-section .section-heading {
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 5px;
 }
 
 .draft-row,
@@ -987,6 +1058,12 @@ h3 {
   gap: 7px;
   overflow-x: auto;
   padding: 4px 3px 3px;
+}
+
+.draft-row {
+  justify-content: center;
+  overflow: visible;
+  padding-inline: 2px;
 }
 
 .player-seat.viewer .seat-hand {
@@ -1479,24 +1556,36 @@ h3 {
 
 .mini-card {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  min-width: 46px;
-  min-height: 38px;
-  padding: 4px;
+  display: grid;
+  width: 45px;
+  min-width: 45px;
+  height: 50px;
+  min-height: 50px;
+  place-items: center;
+  overflow: hidden;
+  padding: 5px;
   border: 1px solid rgba(32, 36, 42, 0.35);
-  border-radius: 7px;
-  background: #ffffff;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.97), rgba(246, 249, 250, 0.97)),
+    #ffffff;
+  box-shadow: inset 0 0 0 2px var(--suit-soft);
 }
 
-.mini-card span {
-  min-width: 20px;
+.mini-card .mini-rank {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  place-items: center;
   border-radius: 999px;
-  background: #f2f5f7;
-  color: var(--ink);
+  background: var(--suit-soft);
+  color: var(--suit);
+  font-size: 0.62rem;
   font-weight: 900;
+  line-height: 1;
   text-align: center;
 }
 
@@ -3557,9 +3646,9 @@ dd {
     border-radius: 5px;
   }
 
-  .discard-pile .mini-card {
-    min-width: 22px;
-    min-height: 24px;
+  .discard-pile .pile-top-card {
+    width: 21px;
+    height: 25px;
   }
 
   .pile-copy strong {
