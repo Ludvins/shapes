@@ -21,6 +21,7 @@ export function getDefaultServerUrl(): string {
 }
 
 export const DEFAULT_SERVER_URL = getDefaultServerUrl();
+const REQUEST_TIMEOUT_MS = 20_000;
 
 function trimBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
@@ -28,21 +29,32 @@ function trimBaseUrl(baseUrl: string): string {
 
 async function requestJson<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
   const trimmedBaseUrl = trimBaseUrl(baseUrl);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let response: Response;
 
   try {
     response = await fetch(`${trimmedBaseUrl}${path}`, {
       ...init,
+      signal: controller.signal,
       headers: {
         "content-type": "application/json",
         ...init?.headers
       }
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(
+        `The Shapes server at ${trimmedBaseUrl} did not respond within 20 seconds. If this is a Render free service, open ${trimmedBaseUrl}/health and wait for it to wake up, or check the Render deploy logs.`
+      );
+    }
+
     throw new Error(`Could not reach the Shapes server at ${trimmedBaseUrl}. Check that the server is running and the URL is reachable.`);
+  } finally {
+    window.clearTimeout(timeout);
   }
 
-  const body = (await response.json()) as unknown;
+  const body = (await response.json().catch(() => ({}))) as unknown;
 
   if (!response.ok) {
     const message =
