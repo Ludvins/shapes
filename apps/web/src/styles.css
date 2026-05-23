@@ -834,7 +834,7 @@ h3 {
 .command-rail {
   position: static;
   display: grid;
-  grid-template-rows: minmax(206px, 1.02fr) minmax(0, 1.38fr);
+  grid-template-rows: minmax(224px, 1.05fr) minmax(130px, 0.72fr) minmax(118px, 0.52fr);
   gap: 8px;
   height: 100%;
   min-height: 0;
@@ -2330,14 +2330,97 @@ dd {
 .table-info-panel,
 .objectives-panel,
 .clue-history,
-.event-log {
+.event-log,
+.event-log-panel {
   min-height: 0;
   overflow: hidden;
 }
 
-.command-rail .table-info-panel {
+.command-rail .table-info-panel,
+.command-rail .event-log-panel {
   overflow: auto;
   scrollbar-gutter: stable;
+}
+
+.event-log-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.event-timeline {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 0;
+  list-style: none;
+}
+
+.event-timeline-item {
+  --event-accent: var(--blue);
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid rgba(44, 51, 57, 0.1);
+  border-radius: 8px;
+  background: #f7fafb;
+}
+
+.event-card_played,
+.event-game_started {
+  --event-accent: var(--green);
+}
+
+.event-card_discarded,
+.event-card_drawn {
+  --event-accent: var(--blue);
+}
+
+.event-card_misplayed,
+.event-game_finished {
+  --event-accent: var(--coral);
+}
+
+.event-clue_given {
+  --event-accent: var(--felt);
+}
+
+.event-final_round_started {
+  --event-accent: var(--amber);
+}
+
+.event-turn {
+  display: inline-grid;
+  min-width: 25px;
+  min-height: 19px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--event-accent) 13%, white);
+  color: var(--event-accent);
+  font-size: 0.58rem;
+  font-weight: 950;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--event-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--event-accent) 15%, transparent);
+}
+
+.event-message {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
 }
 
 .deck-info-card {
@@ -3094,7 +3177,7 @@ dd {
   }
 
   .command-rail {
-    grid-template-rows: minmax(184px, 0.94fr) minmax(0, 1.22fr);
+    grid-template-rows: minmax(176px, 0.95fr) minmax(112px, 0.58fr) minmax(86px, 0.42fr);
     gap: 6px;
   }
 
@@ -3249,6 +3332,472 @@ dd {
     padding-left: 16px;
     font-size: 0.72rem;
     line-height: 1.25;
+  }
+
+  .event-timeline {
+    gap: 4px;
+  }
+
+  .event-timeline-item {
+    gap: 5px;
+    padding: 5px 6px;
+  }
+
+  .event-message {
+    font-size: 0.68rem;
+    line-height: 1.18;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 820px) {
+  .app-shell {
+    gap: 4px;
+    padding: 4px 10px 6px;
+  }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 0.92;
+  }
+
+  h2 {
+    font-size: 0.9rem;
+  }
+
+  h3 {
+    font-size: 0.78rem;
+  }
+
+  .eyebrow {
+    font-size: 0.58rem;
+  }
+
+  .top-bar {
+    align-items: end;
+  }
+
+  .setup-controls {
+    gap: 5px;
+  }
+
+  .setup-controls label {
+    gap: 2px;
+    font-size: 0.52rem;
+  }
+
+  .setup-controls button,
+  .setup-controls input,
+  .setup-controls select {
+    min-height: 26px;
+    padding-inline: 6px;
+    font-size: 0.72rem;
+  }
+
+  .status-strip {
+    min-height: 26px;
+    padding: 2px 4px;
+  }
+
+  .status-item {
+    gap: 5px;
+    padding: 2px 6px;
+  }
+
+  .status-item span {
+    font-size: 0.5rem;
+  }
+
+  .status-item strong {
+    font-size: 0.74rem;
+  }
+
+  .table-options {
+    min-height: 31px;
+    padding: 3px 6px;
+  }
+
+  .score-bar-summary {
+    min-height: 24px;
+    padding: 2px 6px;
+  }
+
+  .score-bar-summary strong {
+    font-size: 0.86rem;
+  }
+
+  .score-bar-summary em {
+    font-size: 0.72rem;
+  }
+
+  .score-bar-summary small {
+    font-size: 0.54rem;
+  }
+
+  .table-options .compact-button {
+    min-height: 25px;
+    padding-inline: 7px;
+    font-size: 0.72rem;
+  }
+
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 8px;
+  }
+
+  .felt-table {
+    grid-template-rows: minmax(84px, auto) minmax(0, 1fr) minmax(100px, auto);
+    gap: 5px;
+    padding: 10px 14px 9px;
+    border-width: 6px;
+    border-radius: 28px;
+  }
+
+  .table-rim {
+    inset: 8px;
+    border-radius: 22px;
+  }
+
+  .opponent-seats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 5px;
+  }
+
+  .player-seat {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .seat-avatar {
+    flex-basis: 22px;
+    width: 22px;
+    height: 22px;
+    font-size: 0.76rem;
+  }
+
+  .seat-header {
+    gap: 6px;
+  }
+
+  .seat-header span {
+    margin-top: 0;
+    font-size: 0.58rem;
+  }
+
+  .seat-hand,
+  .draft-row {
+    gap: 5px;
+  }
+
+  .hand-card-wrap {
+    flex-basis: 58px;
+  }
+
+  .player-seat.opponent .hand-card-wrap {
+    flex-basis: 50px;
+  }
+
+  .card {
+    height: 72px;
+    padding: 5px;
+    border-radius: 8px;
+  }
+
+  .player-seat.opponent .card {
+    height: 62px;
+  }
+
+  .player-seat.viewer {
+    width: min(100%, 500px);
+  }
+
+  .viewer-seat {
+    margin-top: 0;
+  }
+
+  .card-center .shape-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .card-center strong {
+    width: 17px;
+    height: 17px;
+    font-size: 0.66rem;
+  }
+
+  .card-corner {
+    top: 5px;
+    left: 5px;
+    font-size: 0.68rem;
+  }
+
+  .card-corner.bottom {
+    right: 5px;
+    bottom: 5px;
+  }
+
+  .card-corner .shape-icon {
+    width: 10px;
+    height: 10px;
+  }
+
+  .table-center {
+    width: min(100%, 500px);
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 4px 6px;
+    margin-bottom: 2px;
+    transform: none;
+  }
+
+  .table-token-tray {
+    width: 100%;
+    grid-template-columns: 0.82fr 0.58fr 1.18fr;
+    gap: 4px;
+  }
+
+  .felt-token-cluster {
+    min-height: 34px;
+    padding: 4px 5px;
+    gap: 2px;
+  }
+
+  .felt-token-heading span {
+    font-size: 0.52rem;
+  }
+
+  .felt-token-heading strong {
+    font-size: 0.72rem;
+  }
+
+  .insight-chip {
+    width: 9px;
+    height: 9px;
+  }
+
+  .crack-shard {
+    width: 13px;
+    height: 13px;
+  }
+
+  .clue-note,
+  .empty-clue-note {
+    min-width: 42px;
+    max-width: 58px;
+    padding: 3px 4px;
+  }
+
+  .clue-note strong {
+    font-size: 0.54rem;
+  }
+
+  .clue-note small,
+  .empty-clue-note {
+    font-size: 0.46rem;
+  }
+
+  .blueprint-board {
+    padding: 6px 8px;
+  }
+
+  .section-heading {
+    margin-bottom: 4px;
+  }
+
+  .section-heading h2 {
+    font-size: 0.82rem;
+  }
+
+  .section-note {
+    font-size: 0.54rem;
+  }
+
+  .blueprint-lanes {
+    gap: 0;
+  }
+
+  .blueprint-lane {
+    grid-template-columns: 76px 170px;
+    min-height: 25px;
+    gap: 5px;
+  }
+
+  .blueprint-lane-label {
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  .blueprint-lane-label .shape-icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  .blueprint-stair {
+    width: 170px;
+    height: 25px;
+  }
+
+  .blueprint-step {
+    width: 36px;
+    height: 20px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+  }
+
+  .blueprint-step.step-2 {
+    left: 32px;
+    bottom: 2px;
+  }
+
+  .blueprint-step.step-3 {
+    left: 64px;
+    bottom: 4px;
+  }
+
+  .blueprint-step.step-4 {
+    left: 96px;
+    bottom: 6px;
+  }
+
+  .blueprint-step.step-5 {
+    left: 128px;
+    bottom: 8px;
+  }
+
+  .blueprint-card span {
+    width: 13px;
+    height: 13px;
+    font-size: 0.56rem;
+  }
+
+  .blueprint-card .shape-icon {
+    width: 15px;
+    height: 15px;
+  }
+
+  .draft-section {
+    padding: 5px 7px 6px;
+  }
+
+  .draft-section .section-heading {
+    margin-bottom: 2px;
+  }
+
+  .draft-row {
+    padding-block: 2px;
+  }
+
+  .draft-row .hand-card-wrap {
+    flex-basis: 48px;
+  }
+
+  .draft-row .card {
+    height: 58px;
+    padding: 4px;
+  }
+
+  .draft-row .card-center .shape-icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .draft-row .card-center strong {
+    width: 14px;
+    height: 14px;
+    font-size: 0.56rem;
+  }
+
+  .table-objects {
+    gap: 3px;
+  }
+
+  .table-object {
+    min-height: 28px;
+    gap: 4px;
+    padding: 0 4px;
+  }
+
+  .pile-art {
+    width: 23px;
+    height: 25px;
+  }
+
+  .deck-pile span,
+  .contract-pile span,
+  .empty-pile {
+    width: 17px;
+    height: 23px;
+    border-radius: 5px;
+  }
+
+  .pile-copy strong {
+    font-size: 0.56rem;
+  }
+
+  .pile-copy small {
+    font-size: 0.46rem;
+  }
+
+  .pile-top-card {
+    width: 20px;
+    height: 24px;
+  }
+
+  .command-rail {
+    grid-template-rows: minmax(174px, 0.98fr) minmax(112px, 0.54fr) minmax(92px, 0.4fr);
+    gap: 5px;
+  }
+
+  .action-panel {
+    gap: 4px;
+    padding: 7px;
+  }
+
+  .action-header {
+    gap: 7px;
+  }
+
+  .insight-meter {
+    min-width: 58px;
+    padding: 4px 6px;
+  }
+
+  .insight-meter span,
+  .action-context span,
+  .clue-target-header span {
+    font-size: 0.54rem;
+  }
+
+  .insight-meter strong {
+    font-size: 0.82rem;
+  }
+
+  .turn-coach {
+    padding: 4px 5px;
+  }
+
+  .clue-workbench,
+  .clue-button-groups {
+    gap: 3px;
+  }
+
+  .clue-chip {
+    min-height: 20px;
+  }
+
+  .objective {
+    padding: 5px 6px;
+  }
+
+  .objective small {
+    font-size: 0.68rem;
+  }
+
+  .event-timeline-item {
+    padding: 4px 5px;
+  }
+
+  .event-message {
+    font-size: 0.64rem;
   }
 }
 

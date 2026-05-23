@@ -256,7 +256,6 @@ export function App() {
   const [cluePreview, setCluePreview] = useState<CluePreview>(null);
   const [tableFeedback, setTableFeedback] = useState<TableFeedback | null>(null);
   const [showRules, setShowRules] = useState(false);
-  const [showLog, setShowLog] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
   const onlineState = useMemo(() => {
     return onlineRoom?.gameView ? gameStateFromPlayerView(onlineRoom.gameView, onlineRoom.seed) : null;
@@ -565,7 +564,6 @@ export function App() {
       ) : null}
 
       {showRules ? <RulesDrawer onClose={() => setShowRules(false)} /> : null}
-      {showLog ? <LogDrawer events={activeEvents} onClose={() => setShowLog(false)} /> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
       {mode === "online" && !onlineRoom ? (
@@ -613,9 +611,6 @@ export function App() {
             <div className="table-option-buttons">
               <button type="button" className="secondary-button compact-button" onClick={() => setShowRules(true)}>
                 Rules
-              </button>
-              <button type="button" className="secondary-button compact-button" onClick={() => setShowLog(true)}>
-                Log
               </button>
               {mode === "online" && onlineRoom ? (
                 <button
@@ -676,6 +671,7 @@ export function App() {
                 filteredDiscards={filteredDiscards}
                 onFiltersChange={setDiscardFilters}
               />
+              <EventLogPanel events={activeEvents} />
             </aside>
           </div>
         </>
@@ -928,29 +924,29 @@ function RulesDrawer({ onClose }: { onClose: () => void }) {
   );
 }
 
-function LogDrawer({ events, onClose }: { events: GameEvent[]; onClose: () => void }) {
+function EventLogPanel({ events }: { events: GameEvent[] }) {
+  const visibleEvents = events.slice(0, 12);
+
   return (
-    <div className="overlay-scrim" role="presentation" onMouseDown={onClose}>
-      <section className="dialog-card log-dialog" role="dialog" aria-modal="true" aria-label="Game log" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="dialog-header">
-          <div>
-            <span className="panel-kicker">Log</span>
-            <h2>Table Events</h2>
-          </div>
-          <button type="button" className="ghost-dark-button" onClick={onClose} aria-label="Close log">
-            Close
-          </button>
-        </div>
-        <ol className="log-dialog-list">
-          {events.map((event, index) => (
-            <li key={`${event.id}-${index}`}>
-              <strong>Turn {event.turn}</strong>
-              <span>{event.message}</span>
+    <section className="panel-section event-log-panel" aria-label="Table log">
+      <div className="section-heading compact">
+        <h2>Log</h2>
+        <span className="section-note">{events.length} events</span>
+      </div>
+      {visibleEvents.length === 0 ? (
+        <p className="muted compact-muted">No table events yet.</p>
+      ) : (
+        <ol className="event-timeline">
+          {visibleEvents.map((event, index) => (
+            <li className={`event-timeline-item event-${event.type}`} key={`${event.id}-${index}`}>
+              <span className="event-turn">T{event.turn}</span>
+              <span className="event-dot" aria-hidden="true" />
+              <span className="event-message">{event.message}</span>
             </li>
           ))}
         </ol>
-      </section>
-    </div>
+      )}
+    </section>
   );
 }
 
