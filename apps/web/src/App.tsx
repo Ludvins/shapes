@@ -1205,6 +1205,8 @@ function StatusItem({ label, value, danger = false }: { label: string; value: st
 }
 
 function Blueprints({ state, feedback }: { state: GameState; feedback: TableFeedback | null }) {
+  const justPlayedShape = feedback?.kind === "played" ? feedback.card?.shape : null;
+
   return (
     <section className={feedback?.kind === "played" ? "board-section blueprint-board pulse-played" : "board-section blueprint-board"}>
       <div className="section-heading">
@@ -1213,7 +1215,7 @@ function Blueprints({ state, feedback }: { state: GameState; feedback: TableFeed
       </div>
       <div className="blueprint-lanes">
         {SHAPE_FAMILIES.map((shape) => (
-          <div className="blueprint-lane" key={shape}>
+          <div className={shape === justPlayedShape ? "blueprint-lane lane-receiving-card" : "blueprint-lane"} key={shape}>
             <div className="blueprint-lane-label">
               <ShapeIcon shape={shape} />
               <span>{formatShape(shape)}</span>
@@ -1305,8 +1307,8 @@ function DraftRow({
           <div
             className={
               selectedCard?.source === "draft" && selectedCard.cardIndex === index
-                ? "hand-card-wrap selected"
-                : "hand-card-wrap"
+                ? "hand-card-wrap draft-card-wrap playable-card selected"
+                : "hand-card-wrap draft-card-wrap playable-card"
             }
             key={`${card.id}-${index}`}
           >
@@ -1380,6 +1382,7 @@ function PokerTable({
               revealAll={revealAll}
               canAct={canActForCurrentPlayer}
               cluePreview={cluePreview}
+              feedback={feedback}
               selectedCard={selectedCard}
               onSelectedCardChange={onSelectedCardChange}
               gamePhase={state.phase}
@@ -1420,6 +1423,7 @@ function PokerTable({
             revealAll={revealAll}
             canAct={canActForCurrentPlayer}
             cluePreview={cluePreview}
+            feedback={feedback}
             selectedCard={selectedCard}
             onSelectedCardChange={onSelectedCardChange}
             gamePhase={state.phase}
@@ -1641,6 +1645,7 @@ function PlayerSeat({
   revealAll,
   canAct,
   cluePreview,
+  feedback,
   selectedCard,
   onSelectedCardChange,
   gamePhase,
@@ -1652,6 +1657,7 @@ function PlayerSeat({
   revealAll: boolean;
   canAct: boolean;
   cluePreview: CluePreview;
+  feedback: TableFeedback | null;
   selectedCard: CardSelection;
   onSelectedCardChange: (selection: CardSelection) => void;
   gamePhase: GameState["phase"];
@@ -1677,7 +1683,16 @@ function PlayerSeat({
             selectedCard?.source === "hand" && selectedCard.playerId === player.id && selectedCard.cardIndex === index;
           const previewMatch =
             cluePreview?.targetPlayerId === player.id && handCard.card[cluePreview.clue.kind] === cluePreview.clue.value;
-          const className = `hand-card-wrap${isSelected ? " selected" : ""}${previewMatch ? " clue-preview-match" : ""}`;
+          const isRecentFeedbackCard = feedback?.card?.id === handCard.card.id;
+          const animationClass =
+            isRecentFeedbackCard && feedback.kind === "discarded"
+              ? " animate-discarded"
+              : isRecentFeedbackCard && feedback.kind === "misplayed"
+                ? " animate-misplayed"
+                : feedback?.kind === "drawn" && isCurrent
+                  ? " animate-drawn"
+                  : "";
+          const className = `hand-card-wrap${selectable ? " playable-card" : ""}${isSelected ? " selected" : ""}${previewMatch ? " clue-preview-match" : ""}${animationClass}`;
 
           return (
             <div className={className} key={`${handCard.card.id}-${index}`}>
