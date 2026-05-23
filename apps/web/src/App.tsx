@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   RANKS,
   SHAPE_FAMILIES,
@@ -68,12 +68,18 @@ type TableFocus = "deck" | "discard" | "objectives";
 type OnlineBusyState = "idle" | "creating" | "joining" | "starting" | "refreshing";
 type CardSelection = { playerId: string; cardIndex: number; source: "hand" | "draft" } | null;
 type CluePreview = { targetPlayerId: string; clue: ClueValue } | null;
-type FeedbackKind = "played" | "discarded" | "misplayed" | "drawn" | "clue" | "final" | "finished";
+type FeedbackKind = "started" | "played" | "discarded" | "misplayed" | "drawn" | "clue" | "final" | "finished";
+type FeedbackCue = FeedbackKind | "turn";
 
 interface TableFeedback {
   id: number;
   kind: FeedbackKind;
   card?: Card;
+}
+
+interface TurnNotice {
+  id: number;
+  playerName: string;
 }
 
 interface DiscardFilters {
@@ -110,6 +116,8 @@ const EMPTY_DISCARD_FILTERS: DiscardFilters = {
 };
 
 const savedSession = loadSavedSession();
+const SOUND_SAVE_KEY = "shapes.sound-enabled.v1";
+let feedbackAudioContext: AudioContext | null = null;
 
 function newSeed(): string {
   return `local-${Date.now().toString(36)}`;
@@ -229,6 +237,129 @@ function loadSavedSession(): SavedSession | null {
   }
 }
 
+function loadSoundEnabled(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  return window.localStorage.getItem(SOUND_SAVE_KEY) !== "false";
+}
+
+function getFeedbackAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (feedbackAudioContext) {
+    return feedbackAudioContext;
+  }
+
+  const AudioContextConstructor =
+    window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  if (!AudioContextConstructor) {
+    return null;
+  }
+
+  feedbackAudioContext = new AudioContextConstructor();
+  return feedbackAudioContext;
+}
+
+function armFeedbackAudio(): boolean {
+  const context = getFeedbackAudioContext();
+
+  if (!context) {
+    return false;
+  }
+
+  if (context.state === "suspended") {
+    void context.resume();
+  }
+
+  return true;
+}
+
+function playTone(
+  context: AudioContext,
+  time: number,
+  frequency: number,
+  duration: number,
+  gainValue: number,
+  type: OscillatorType = "sine"
+): void {
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, time);
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.018);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start(time);
+  oscillator.stop(time + duration + 0.02);
+}
+
+function playFeedbackCue(cue: FeedbackCue, enabled: boolean): void {
+  if (!enabled) {
+    return;
+  }
+
+  const context = getFeedbackAudioContext();
+
+  if (!context) {
+    return;
+  }
+
+  if (context.state === "suspended") {
+    void context.resume();
+  }
+
+  const now = context.currentTime + 0.012;
+  const gain = 0.035;
+
+  switch (cue) {
+    case "turn":
+      playTone(context, now, 392, 0.11, gain, "triangle");
+      playTone(context, now + 0.11, 523.25, 0.14, gain, "triangle");
+      break;
+    case "started":
+      playTone(context, now, 329.63, 0.1, gain, "sine");
+      playTone(context, now + 0.08, 415.3, 0.12, gain, "sine");
+      playTone(context, now + 0.16, 493.88, 0.14, gain, "sine");
+      break;
+    case "played":
+      playTone(context, now, 523.25, 0.1, gain, "triangle");
+      playTone(context, now + 0.08, 659.25, 0.13, gain, "triangle");
+      break;
+    case "discarded":
+      playTone(context, now, 220, 0.09, gain * 0.8, "square");
+      playTone(context, now + 0.06, 164.81, 0.12, gain * 0.75, "square");
+      break;
+    case "misplayed":
+      playTone(context, now, 196, 0.16, gain * 0.85, "sawtooth");
+      playTone(context, now + 0.08, 146.83, 0.18, gain * 0.75, "sawtooth");
+      break;
+    case "clue":
+      playTone(context, now, 698.46, 0.08, gain * 0.75, "sine");
+      playTone(context, now + 0.07, 783.99, 0.08, gain * 0.75, "sine");
+      break;
+    case "drawn":
+      playTone(context, now, 293.66, 0.08, gain * 0.7, "triangle");
+      break;
+    case "final":
+      playTone(context, now, 392, 0.13, gain, "triangle");
+      playTone(context, now + 0.11, 349.23, 0.15, gain, "triangle");
+      playTone(context, now + 0.22, 293.66, 0.18, gain, "triangle");
+      break;
+    case "finished":
+      playTone(context, now, 261.63, 0.16, gain, "sine");
+      playTone(context, now + 0.13, 329.63, 0.16, gain, "sine");
+      playTone(context, now + 0.26, 392, 0.22, gain, "sine");
+      break;
+  }
+}
+
 export function App() {
   const inviteParams = useMemo(() => readInviteParams(), []);
   const [mode, setMode] = useState<AppMode>(inviteParams ? "online" : "local");
@@ -255,8 +386,13 @@ export function App() {
   const [selectedCard, setSelectedCard] = useState<CardSelection>(null);
   const [cluePreview, setCluePreview] = useState<CluePreview>(null);
   const [tableFeedback, setTableFeedback] = useState<TableFeedback | null>(null);
+  const [turnNotice, setTurnNotice] = useState<TurnNotice | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(loadSoundEnabled);
+  const [soundReady, setSoundReady] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
+  const lastEventSignature = useRef("");
+  const lastTurnNoticeKey = useRef("");
   const onlineState = useMemo(() => {
     return onlineRoom?.gameView ? gameStateFromPlayerView(onlineRoom.gameView, onlineRoom.seed) : null;
   }, [onlineRoom?.gameView, onlineRoom?.seed]);
@@ -275,6 +411,9 @@ export function App() {
     return getLegalActions(state, currentPlayer.id);
   }, [currentPlayer.id, mode, onlineEnginePlayerId, state]);
   const canActForCurrentPlayer = mode === "local" || onlineEnginePlayerId === currentPlayer.id;
+  const isViewerTurn =
+    state.phase === "playing" &&
+    (mode === "online" ? onlineEnginePlayerId === currentPlayer.id : viewer.id === currentPlayer.id);
   const clueHistory = useMemo(() => collectClueHistory(state), [state]);
   const filteredDiscards = useMemo(
     () => filterDiscards(state.discardPile, discardFilters),
@@ -317,6 +456,28 @@ export function App() {
   }, [discardFilters, events, followTurn, playerCount, revealAll, seed, setup, viewerPlayerId]);
 
   useEffect(() => {
+    window.localStorage.setItem(SOUND_SAVE_KEY, String(soundEnabled));
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    if (!soundEnabled) {
+      setSoundReady(false);
+      return;
+    }
+
+    const arm = () => {
+      setSoundReady(armFeedbackAudio());
+    };
+
+    window.addEventListener("pointerdown", arm);
+    window.addEventListener("keydown", arm);
+    return () => {
+      window.removeEventListener("pointerdown", arm);
+      window.removeEventListener("keydown", arm);
+    };
+  }, [soundEnabled]);
+
+  useEffect(() => {
     if (mode !== "online" || !onlineRoom || !onlinePlayerId) {
       return;
     }
@@ -329,6 +490,62 @@ export function App() {
   }, [state.phase, state.turn]);
 
   useEffect(() => {
+    if (!hasActiveGame || activeEvents.length === 0) {
+      return;
+    }
+
+    const signature = activeEvents.slice(0, 4).map((event) => event.id).join("|");
+
+    if (!signature || signature === lastEventSignature.current) {
+      return;
+    }
+
+    const previousSignature = lastEventSignature.current;
+    lastEventSignature.current = signature;
+
+    if (!previousSignature && state.turn > 1) {
+      return;
+    }
+
+    const feedback = feedbackFromEvents(activeEvents);
+    if (feedback) {
+      setTableFeedback(feedback);
+      playFeedbackCue(feedback.kind, soundEnabled);
+    }
+  }, [activeEvents, hasActiveGame, soundEnabled, state.turn]);
+
+  useEffect(() => {
+    if (!hasActiveGame || state.phase !== "playing") {
+      return;
+    }
+
+    const turnKey = `${state.id}:${state.turn}:${currentPlayer.id}:${viewer.id}:${onlinePlayerId}`;
+    if (turnKey === lastTurnNoticeKey.current) {
+      return;
+    }
+
+    lastTurnNoticeKey.current = turnKey;
+
+    if (!isViewerTurn) {
+      return;
+    }
+
+    setTurnNotice({ id: Date.now(), playerName: currentPlayer.name });
+    playFeedbackCue("turn", soundEnabled);
+  }, [
+    currentPlayer.id,
+    currentPlayer.name,
+    hasActiveGame,
+    isViewerTurn,
+    onlinePlayerId,
+    soundEnabled,
+    state.id,
+    state.phase,
+    state.turn,
+    viewer.id
+  ]);
+
+  useEffect(() => {
     if (!tableFeedback) {
       return;
     }
@@ -336,6 +553,15 @@ export function App() {
     const timeout = window.setTimeout(() => setTableFeedback(null), 850);
     return () => window.clearTimeout(timeout);
   }, [tableFeedback]);
+
+  useEffect(() => {
+    if (!turnNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setTurnNotice(null), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [turnNotice]);
 
   function changeMode(nextMode: AppMode) {
     setMode(nextMode);
@@ -488,6 +714,21 @@ export function App() {
     setError("Local save cleared. The current table stays open until you start a new game.");
   }
 
+  function changeSoundEnabled(enabled: boolean) {
+    setSoundEnabled(enabled);
+
+    if (!enabled) {
+      setSoundReady(false);
+      return;
+    }
+
+    const ready = armFeedbackAudio();
+    setSoundReady(ready);
+    if (ready) {
+      playFeedbackCue("turn", true);
+    }
+  }
+
   return (
     <main className="app-shell">
       <section className="top-bar">
@@ -631,9 +872,13 @@ export function App() {
           <FloatingDebugControls
             revealAll={revealAll}
             followTurn={followTurn}
+            soundEnabled={soundEnabled}
+            soundReady={soundReady}
             onRevealAllChange={setRevealAll}
             onFollowTurnChange={setFollowTurn}
+            onSoundEnabledChange={changeSoundEnabled}
           />
+          {turnNotice ? <TurnBanner key={turnNotice.id} playerName={turnNotice.playerName} /> : null}
 
           <div className="game-layout">
             <PokerTable
@@ -1508,7 +1753,7 @@ function ActionPanel({
   }
 
   return (
-    <section className="panel-section action-panel">
+    <section className={canActForCurrentPlayer ? "panel-section action-panel your-turn-panel" : "panel-section action-panel"}>
       <div className="action-header">
         <div>
           <span className="panel-kicker">Action Tray</span>
@@ -1619,7 +1864,7 @@ function TurnCoach({
 
   return (
     <div className="turn-coach">
-      <strong>Choose the turn</strong>
+      <strong>Your turn</strong>
       <span>Give an Insight, or select a card to play/discard.</span>
     </div>
   );
@@ -1766,19 +2011,34 @@ function ScoreBarSummary({ state }: { state: GameState }) {
   );
 }
 
+function TurnBanner({ playerName }: { playerName: string }) {
+  return (
+    <div className="turn-banner" role="status" aria-live="polite">
+      <span>Your turn</span>
+      <strong>{playerName}</strong>
+    </div>
+  );
+}
+
 function FloatingDebugControls({
   revealAll,
   followTurn,
+  soundEnabled,
+  soundReady,
   onRevealAllChange,
-  onFollowTurnChange
+  onFollowTurnChange,
+  onSoundEnabledChange
 }: {
   revealAll: boolean;
   followTurn: boolean;
+  soundEnabled: boolean;
+  soundReady: boolean;
   onRevealAllChange: (enabled: boolean) => void;
   onFollowTurnChange: (enabled: boolean) => void;
+  onSoundEnabledChange: (enabled: boolean) => void;
 }) {
   return (
-    <div className="floating-debug-controls" aria-label="Debug view controls">
+    <div className="floating-debug-controls" aria-label="View and feedback controls">
       <button
         type="button"
         className={revealAll ? "debug-toggle active" : "debug-toggle"}
@@ -1796,6 +2056,16 @@ function FloatingDebugControls({
       >
         <span>Follow</span>
         <strong>{followTurn ? "On" : "Off"}</strong>
+      </button>
+      <button
+        type="button"
+        className={soundEnabled ? "debug-toggle active" : "debug-toggle"}
+        aria-pressed={soundEnabled}
+        onClick={() => onSoundEnabledChange(!soundEnabled)}
+        title={soundEnabled && !soundReady ? "Sound is on. Click or press a key once if the browser has not enabled audio yet." : "Toggle table sounds."}
+      >
+        <span>Sound</span>
+        <strong>{soundEnabled ? (soundReady ? "Ready" : "On") : "Off"}</strong>
       </button>
     </div>
   );
@@ -2367,7 +2637,8 @@ function feedbackFromEvents(events: GameEvent[]): TableFeedback | null {
     "card_misplayed",
     "card_played",
     "card_discarded",
-    "card_drawn"
+    "card_drawn",
+    "game_started"
   ];
   const event = priority.reduce<GameEvent | undefined>(
     (found, type) => found ?? events.find((candidate) => candidate.type === type),
@@ -2379,6 +2650,7 @@ function feedbackFromEvents(events: GameEvent[]): TableFeedback | null {
   }
 
   const kindByType: Partial<Record<GameEvent["type"], FeedbackKind>> = {
+    game_started: "started",
     game_finished: "finished",
     final_round_started: "final",
     clue_given: "clue",
