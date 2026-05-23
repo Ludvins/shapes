@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+coverage/
+*.log
+test-results/
+data/
+packages/game-engine/src/**/*.js
+packages/game-engine/src/**/*.d.ts
+packages/game-engine/src/**/*.d.ts.map
+*.tsbuildinfo

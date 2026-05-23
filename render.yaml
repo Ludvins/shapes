@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: shapes-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm --workspace packages/game-engine run build && npm --workspace apps/server run build
+    startCommand: npm --workspace apps/server run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_VERSION
+        value: 22
+      - key: SHAPES_ROOMS_FILE
+        value: /tmp/shapes-rooms.json

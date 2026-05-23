@@ -1,0 +1,27 @@
+{
+  "name": "shapes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace packages/game-engine run build && npm --workspace apps/server run build && npm --workspace apps/web run build",
+    "serve:dist": "node scripts/serve-dist.mjs",
+    "test": "npm --workspaces --if-present run test",
+    "test:e2e": "npm run build && node scripts/e2e.mjs",
+    "test:watch": "npm --workspace packages/game-engine run test:watch"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.0.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  }
+}
