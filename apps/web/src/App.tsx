@@ -671,6 +671,7 @@ export function App() {
       return;
     }
 
+    setError(null);
     setOnlineBusy("waking-create");
     try {
       await prepareOnlineServer(serverUrl);
@@ -698,6 +699,7 @@ export function App() {
       return;
     }
 
+    setError(null);
     setOnlineBusy("waking-join");
     try {
       await prepareOnlineServer(serverUrl);

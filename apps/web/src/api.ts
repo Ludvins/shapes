@@ -35,32 +35,45 @@ function trimBaseUrl(baseUrl: string): string {
 }
 
 async function wakeServer(baseUrl: string): Promise<void> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), SERVER_WAKE_TIMEOUT_MS);
+  const deadline = Date.now() + SERVER_WAKE_TIMEOUT_MS;
+  let attempt = 0;
 
-  try {
-    const response = await fetch(`${baseUrl}/health`, {
-      cache: "no-store",
-      headers: { accept: "application/json" },
-      signal: controller.signal
-    });
+  while (Date.now() < deadline) {
+    attempt += 1;
+    const controller = new AbortController();
+    const remainingTime = deadline - Date.now();
+    const timeout = window.setTimeout(() => controller.abort(), Math.min(15_000, remainingTime));
 
-    if (!response.ok) {
-      throw new Error(`The Shapes server health check failed with ${response.status}.`);
+    try {
+      const response = await fetch(`${baseUrl}/health`, {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+        signal: controller.signal
+      });
+
+      if (response.ok) {
+        return;
+      }
+
+      if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) {
+        throw new Error(`The Shapes server health check failed with ${response.status}.`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("The Shapes server health check")) {
+        throw error;
+      }
+      // Render can briefly reset or reject requests while a sleeping service boots.
+    } finally {
+      window.clearTimeout(timeout);
     }
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("The game server is taking longer than expected to wake up. Please try again in a moment.");
-    }
 
-    if (error instanceof Error && error.message.startsWith("The Shapes server health check")) {
-      throw error;
+    const retryDelay = Math.min(attempt * 1_000, 5_000, Math.max(0, deadline - Date.now()));
+    if (retryDelay > 0) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, retryDelay));
     }
-
-    throw new Error(`Could not reach the Shapes server at ${baseUrl}. Check that the server is available.`);
-  } finally {
-    window.clearTimeout(timeout);
   }
+
+  throw new Error("The game server is still waking up. Please wait a moment, then try again.");
 }
 
 export function prepareOnlineServer(baseUrl: string): Promise<void> {
