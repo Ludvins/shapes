@@ -22,9 +22,85 @@ export function getDefaultServerUrl(): string {
 
 export const DEFAULT_SERVER_URL = getDefaultServerUrl();
 const REQUEST_TIMEOUT_MS = 20_000;
+const SERVER_WAKE_TIMEOUT_MS = 90_000;
+const SERVER_READY_TTL_MS = 60_000;
+const MIN_ROOM_PLAYERS = 2;
+const MAX_ROOM_PLAYERS = 5;
+const serverWakeRequests = new Map<string, Promise<void>>();
+const serverReadyUntil = new Map<string, number>();
+const rememberedRoomSizes = new Map<string, number>();
 
 function trimBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
+}
+
+async function wakeServer(baseUrl: string): Promise<void> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), SERVER_WAKE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`The Shapes server health check failed with ${response.status}.`);
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The game server is taking longer than expected to wake up. Please try again in a moment.");
+    }
+
+    if (error instanceof Error && error.message.startsWith("The Shapes server health check")) {
+      throw error;
+    }
+
+    throw new Error(`Could not reach the Shapes server at ${baseUrl}. Check that the server is available.`);
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+export function prepareOnlineServer(baseUrl: string): Promise<void> {
+  const trimmedBaseUrl = trimBaseUrl(baseUrl);
+
+  if ((serverReadyUntil.get(trimmedBaseUrl) ?? 0) > Date.now()) {
+    return Promise.resolve();
+  }
+
+  const pendingRequest = serverWakeRequests.get(trimmedBaseUrl);
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  const wakeRequest = wakeServer(trimmedBaseUrl)
+    .then(() => {
+      serverReadyUntil.set(trimmedBaseUrl, Date.now() + SERVER_READY_TTL_MS);
+    })
+    .finally(() => {
+      serverWakeRequests.delete(trimmedBaseUrl);
+    });
+
+  serverWakeRequests.set(trimmedBaseUrl, wakeRequest);
+  return wakeRequest;
+}
+
+function validRoomSize(value: unknown): number | null {
+  const size = Number(value);
+  return Number.isInteger(size) && size >= MIN_ROOM_PLAYERS && size <= MAX_ROOM_PLAYERS ? size : null;
+}
+
+function normalizeRoomView(room: RoomClientView, requestedSize?: number): RoomClientView {
+  const roomSize =
+    validRoomSize(room.expectedPlayerCount) ??
+    validRoomSize(requestedSize) ??
+    rememberedRoomSizes.get(room.id) ??
+    Math.min(MAX_ROOM_PLAYERS, Math.max(MIN_ROOM_PLAYERS, room.players.length));
+
+  rememberedRoomSizes.set(room.id, roomSize);
+  return room.expectedPlayerCount === roomSize ? room : { ...room, expectedPlayerCount: roomSize };
 }
 
 async function requestJson<T>(baseUrl: string, path: string, init?: RequestInit): Promise<T> {
@@ -74,14 +150,14 @@ export function createOnlineRoom(
   return requestJson<RoomClientView>(baseUrl, "/rooms", {
     method: "POST",
     body: JSON.stringify(body)
-  });
+  }).then((room) => normalizeRoomView(room, body.expectedPlayerCount));
 }
 
 export function joinOnlineRoom(baseUrl: string, roomId: string, body: { playerName: string }): Promise<RoomClientView> {
   return requestJson<RoomClientView>(baseUrl, `/rooms/${roomId}/join`, {
     method: "POST",
     body: JSON.stringify(body)
-  });
+  }).then((room) => normalizeRoomView(room));
 }
 
 export function getOnlineRoom(
@@ -93,14 +169,14 @@ export function getOnlineRoom(
   return requestJson<RoomClientView>(
     baseUrl,
     `/rooms/${roomId}?playerId=${encodeURIComponent(playerId)}&revealAll=${String(revealAll)}`
-  );
+  ).then((room) => normalizeRoomView(room));
 }
 
 export function startOnlineRoom(baseUrl: string, roomId: string, body: { hostPlayerId: string }): Promise<RoomClientView> {
   return requestJson<RoomClientView>(baseUrl, `/rooms/${roomId}/start`, {
     method: "POST",
     body: JSON.stringify(body)
-  });
+  }).then((room) => normalizeRoomView(room));
 }
 
 export function submitOnlineAction(
@@ -111,7 +187,7 @@ export function submitOnlineAction(
   return requestJson<RoomClientView>(baseUrl, `/rooms/${roomId}/actions`, {
     method: "POST",
     body: JSON.stringify(body)
-  });
+  }).then((room) => normalizeRoomView(room));
 }
 
 export function getOnlinePlayerView(
@@ -139,7 +215,7 @@ export function subscribeToOnlineRoom(
   );
 
   events.addEventListener("room", (event) => {
-    onRoom(JSON.parse(event.data) as RoomClientView);
+    onRoom(normalizeRoomView(JSON.parse(event.data) as RoomClientView));
   });
   events.onerror = () => {
     onError("Lost server event stream. The room will refresh after the next action.");

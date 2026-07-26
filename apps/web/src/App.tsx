@@ -28,6 +28,7 @@ import {
   createOnlineRoom,
   getOnlineRoom,
   joinOnlineRoom,
+  prepareOnlineServer,
   startOnlineRoom,
   submitOnlineAction,
   subscribeToOnlineRoom
@@ -66,7 +67,14 @@ type AppView = "welcome" | "table";
 type GameSetup = { state: GameState; events: GameEvent[] };
 type FilterValue<T extends string | number> = "all" | T;
 type TableFocus = "deck" | "discard" | "objectives";
-type OnlineBusyState = "idle" | "creating" | "joining" | "starting" | "refreshing";
+type OnlineBusyState =
+  | "idle"
+  | "waking-create"
+  | "creating"
+  | "waking-join"
+  | "joining"
+  | "starting"
+  | "refreshing";
 type CardSelection = { playerId: string; cardIndex: number; source: "hand" | "draft" } | null;
 type CluePreview = { targetPlayerId: string; clue: ClueValue } | null;
 type FeedbackKind = "started" | "played" | "discarded" | "misplayed" | "drawn" | "clue" | "final" | "finished";
@@ -402,6 +410,12 @@ export function App() {
   const [onlinePlayerId, setOnlinePlayerId] = useState("");
   const [onlineBusy, setOnlineBusy] = useState<OnlineBusyState>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void prepareOnlineServer(serverUrl).catch(() => {
+      // Lobby creation and joining surface connection errors when the player acts.
+    });
+  }, [serverUrl]);
   const [tableFocus, setTableFocus] = useState<TableFocus>("objectives");
   const [selectedCard, setSelectedCard] = useState<CardSelection>(null);
   const [cluePreview, setCluePreview] = useState<CluePreview>(null);
@@ -657,8 +671,10 @@ export function App() {
       return;
     }
 
-    setOnlineBusy("creating");
+    setOnlineBusy("waking-create");
     try {
+      await prepareOnlineServer(serverUrl);
+      setOnlineBusy("creating");
       const room = await createOnlineRoom(serverUrl, {
         hostName: requestedName.trim() || "Player",
         expectedPlayerCount: requestedPlayerCount,
@@ -682,8 +698,10 @@ export function App() {
       return;
     }
 
-    setOnlineBusy("joining");
+    setOnlineBusy("waking-join");
     try {
+      await prepareOnlineServer(serverUrl);
+      setOnlineBusy("joining");
       const name = requestedName.trim() || "Player";
       const room = await joinOnlineRoom(serverUrl, requestedRoomId.trim(), { playerName: name });
       const joinedPlayer =
@@ -1363,7 +1381,11 @@ function OnlineRoomSetup({
             </select>
           </label>
           <button type="button" onClick={onCreate} disabled={isBusy || onlineName.trim().length === 0}>
-            {busy === "creating" ? "Creating lobby..." : "Create lobby"}
+            {busy === "waking-create"
+              ? "Waking server..."
+              : busy === "creating"
+                ? "Creating lobby..."
+                : "Create lobby"}
           </button>
         </article>
 
@@ -1395,7 +1417,11 @@ function OnlineRoomSetup({
             onClick={onJoin}
             disabled={isBusy || onlineName.trim().length === 0 || normalizedCode.length === 0}
           >
-            {busy === "joining" ? "Joining lobby..." : "Join lobby"}
+            {busy === "waking-join"
+              ? "Waking server..."
+              : busy === "joining"
+                ? "Joining lobby..."
+                : "Join lobby"}
           </button>
         </article>
       </div>

@@ -180,7 +180,7 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   }
 
   if (url.pathname === "/health") {
-    sendJson(response, 200, { ok: true, rooms: rooms.size, persistence: roomsFile });
+    sendJson(response, 200, { ok: true, roomSchemaVersion: 2, rooms: rooms.size, persistence: roomsFile });
     return;
   }
 
