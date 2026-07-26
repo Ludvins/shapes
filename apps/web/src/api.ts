@@ -93,11 +93,11 @@ function validRoomSize(value: unknown): number | null {
 }
 
 function normalizeRoomView(room: RoomClientView, requestedSize?: number): RoomClientView {
+  const serverRoomSize = validRoomSize(room.expectedPlayerCount);
+  const minimumVisibleSize = Math.min(MAX_ROOM_PLAYERS, Math.max(MIN_ROOM_PLAYERS, room.players.length));
   const roomSize =
-    validRoomSize(room.expectedPlayerCount) ??
-    validRoomSize(requestedSize) ??
-    rememberedRoomSizes.get(room.id) ??
-    Math.min(MAX_ROOM_PLAYERS, Math.max(MIN_ROOM_PLAYERS, room.players.length));
+    serverRoomSize ??
+    Math.max(validRoomSize(requestedSize) ?? 0, rememberedRoomSizes.get(room.id) ?? 0, minimumVisibleSize);
 
   rememberedRoomSizes.set(room.id, roomSize);
   return room.expectedPlayerCount === roomSize ? room : { ...room, expectedPlayerCount: roomSize };
