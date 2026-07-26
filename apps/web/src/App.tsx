@@ -787,8 +787,8 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <section className="top-bar">
+    <main className={hasActiveGame ? "app-shell game-screen" : "app-shell"}>
+      <section className={hasActiveGame ? "top-bar game-top-bar" : "top-bar"}>
         <button type="button" className="brand-lockup" onClick={() => setAppView("welcome")} aria-label="Back to Shapes home">
           <span className="brand-mark" aria-hidden="true">
             <i />
@@ -800,6 +800,21 @@ export function App() {
             <span className="brand-title">Shapes</span>
           </span>
         </button>
+        {hasActiveGame ? (
+          <div className="game-presence" aria-live="polite">
+            <span className={isViewerTurn ? "presence-orb active" : "presence-orb"} aria-hidden="true" />
+            <span>
+              <small>{isViewerTurn ? "Your move" : "Now playing"}</small>
+              <strong>{currentPlayer.name}</strong>
+            </span>
+            {mode === "online" && onlineRoom ? (
+              <span className="room-code-chip" title="Share this room code">
+                <small>Room</small>
+                <strong>{onlineRoom.code}</strong>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="setup-controls" aria-label="Game setup">
           <label>
             Mode
@@ -899,41 +914,17 @@ export function App() {
 
       {hasActiveGame ? (
         <>
-          <section className="status-strip" aria-label="Game status">
-            <StatusItem label="Turn" value={state.turn.toString()} />
-            <StatusItem label="Current" value={currentPlayer.name} />
-            <StatusItem label="Seat" value={viewer.name} />
-            <StatusItem label="Insight" value={`${state.insightTokens}/${state.maxInsightTokens}`} />
-            <StatusItem
-              label="Cracks"
-              value={`${state.crackTokens}/${state.maxCrackTokens}`}
-              danger={state.crackTokens > 0}
-            />
-            <StatusItem label="Deck" value={state.deck.length.toString()} />
-            <StatusItem label="Table" value={mode === "online" && onlineRoom ? `v${onlineRoom.version}` : "Local"} />
-          </section>
-
-          <section className="table-options" aria-label="View options">
-            <ScoreBarSummary state={state} />
-            <div className="table-option-buttons">
-              <button type="button" className="secondary-button compact-button" onClick={() => setShowRules(true)}>
-                Rules
-              </button>
-              {mode === "online" && onlineRoom ? (
-                <button
-                  type="button"
-                  className="secondary-button compact-button"
-                  onClick={() => void refreshRoom()}
-                  disabled={onlineBusy !== "idle"}
-                >
-                  {onlineBusy === "refreshing" ? "Refreshing..." : "Refresh"}
-                </button>
-              ) : null}
-            </div>
-            {state.finalTurnsRemaining !== null && state.phase === "playing" ? (
-              <strong>{state.finalTurnsRemaining} final turns remaining</strong>
-            ) : null}
-          </section>
+          <GameHud
+            state={state}
+            currentPlayerName={currentPlayer.name}
+            viewerName={viewer.name}
+            isViewerTurn={isViewerTurn}
+            tableLabel={mode === "online" && onlineRoom ? `Live · v${onlineRoom.version}` : "Local table"}
+            onlineBusy={onlineBusy}
+            canRefresh={mode === "online" && Boolean(onlineRoom)}
+            onShowRules={() => setShowRules(true)}
+            onRefresh={() => void refreshRoom()}
+          />
 
           <FloatingDebugControls
             revealAll={revealAll}
@@ -1520,6 +1511,111 @@ function EventLogPanel({ events }: { events: GameEvent[] }) {
           ))}
         </ol>
       )}
+    </section>
+  );
+}
+
+function GameHud({
+  state,
+  currentPlayerName,
+  viewerName,
+  isViewerTurn,
+  tableLabel,
+  onlineBusy,
+  canRefresh,
+  onShowRules,
+  onRefresh
+}: {
+  state: GameState;
+  currentPlayerName: string;
+  viewerName: string;
+  isViewerTurn: boolean;
+  tableLabel: string;
+  onlineBusy: OnlineBusyState;
+  canRefresh: boolean;
+  onShowRules: () => void;
+  onRefresh: () => void;
+}) {
+  const completedBlueprints = SHAPE_FAMILIES.reduce(
+    (total, shape) => total + state.blueprints[shape].length,
+    0
+  );
+  const progress = Math.round((completedBlueprints / (SHAPE_FAMILIES.length * RANKS.length)) * 100);
+  const nextShape = SHAPE_FAMILIES.find((shape) => state.blueprints[shape].length < RANKS.length);
+
+  return (
+    <section className="game-hud" aria-label="Game overview">
+      <div className={isViewerTurn ? "hud-turn-card active" : "hud-turn-card"}>
+        <span className="hud-turn-badge">
+          <small>Turn</small>
+          <strong>{state.turn}</strong>
+        </span>
+        <div className="hud-turn-copy">
+          <span>{isViewerTurn ? "Your move" : `${currentPlayerName} is thinking`}</span>
+          <strong>{currentPlayerName}&rsquo;s turn</strong>
+          <small>{isViewerTurn ? "Read the table. Make it count." : `You are viewing ${viewerName}.`}</small>
+        </div>
+      </div>
+
+      <div className="hud-mission-card">
+        <div className="mission-title-row">
+          <span>
+            <small>Shared blueprint</small>
+            <strong>{completedBlueprints} / 25 placed</strong>
+          </span>
+          <b>{progress}%</b>
+        </div>
+        <span
+          className="mission-progress"
+          role="progressbar"
+          aria-label="Blueprint completion"
+          aria-valuemin={0}
+          aria-valuemax={25}
+          aria-valuenow={completedBlueprints}
+        >
+          <i style={{ width: `${progress}%` }} />
+        </span>
+        <small className="mission-next">
+          {state.phase === "finished"
+            ? "The final design is complete."
+            : nextShape
+              ? `Next focus · ${formatShape(nextShape)} ${state.blueprints[nextShape].length + 1}`
+              : "Every shape staircase is complete."}
+        </small>
+      </div>
+
+      <div className="hud-stat-grid">
+        <StatusItem label="Insight" value={`${state.insightTokens}/${state.maxInsightTokens}`} />
+        <StatusItem
+          label="Cracks"
+          value={`${state.crackTokens}/${state.maxCrackTokens}`}
+          danger={state.crackTokens > 0}
+        />
+        <StatusItem label="Deck" value={state.deck.length.toString()} />
+        <StatusItem label="Table" value={tableLabel} />
+      </div>
+
+      <div className="hud-score-card">
+        <ScoreBarSummary state={state} />
+        <div className="hud-actions">
+          {state.finalTurnsRemaining !== null && state.phase === "playing" ? (
+            <strong className="final-turns-pill">{state.finalTurnsRemaining} final turns</strong>
+          ) : null}
+          <button type="button" className="secondary-button compact-button" onClick={onShowRules}>
+            How to play
+          </button>
+          {canRefresh ? (
+            <button
+              type="button"
+              className="secondary-button compact-button"
+              onClick={onRefresh}
+              disabled={onlineBusy !== "idle"}
+            >
+              {onlineBusy === "refreshing" ? "Syncing..." : "Sync"}
+            </button>
+          ) : null}
+        </div>
+      </div>
     </section>
   );
 }
