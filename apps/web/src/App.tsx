@@ -66,7 +66,7 @@ type AppMode = "local" | "online";
 type AppView = "welcome" | "table";
 type GameSetup = { state: GameState; events: GameEvent[] };
 type FilterValue<T extends string | number> = "all" | T;
-type TableFocus = "deck" | "discard" | "objectives";
+type TableFocus = "deck" | "discard";
 type OnlineBusyState =
   | "idle"
   | "waking-create"
@@ -416,7 +416,7 @@ export function App() {
       // Lobby creation and joining surface connection errors when the player acts.
     });
   }, [serverUrl]);
-  const [tableFocus, setTableFocus] = useState<TableFocus>("objectives");
+  const [tableFocus, setTableFocus] = useState<TableFocus>("deck");
   const [selectedCard, setSelectedCard] = useState<CardSelection>(null);
   const [cluePreview, setCluePreview] = useState<CluePreview>(null);
   const [tableFeedback, setTableFeedback] = useState<TableFeedback | null>(null);
@@ -630,7 +630,7 @@ export function App() {
     setViewerPlayerId(next.state.players[0].id);
     setSelectedCard(null);
     setCluePreview(null);
-    setTableFocus("objectives");
+    setTableFocus("deck");
     setError(null);
   }
 
@@ -649,7 +649,7 @@ export function App() {
     setRevealAll(false);
     setSelectedCard(null);
     setCluePreview(null);
-    setTableFocus("objectives");
+    setTableFocus("deck");
     setError(null);
     setAppView("table");
   }
@@ -1022,18 +1022,34 @@ export function App() {
           {turnNotice ? <TurnBanner key={turnNotice.id} playerName={turnNotice.playerName} /> : null}
 
           <div className="game-layout">
+            <aside className="pile-rail" aria-label="Draw and discard piles">
+              <TableObjects
+                state={state}
+                selected={tableFocus}
+                feedback={tableFeedback}
+                onSelect={setTableFocus}
+              />
+              <TableInfoPanel
+                focus={tableFocus}
+                state={state}
+                viewerPlayerId={viewer.id}
+                revealAll={revealAll}
+                filters={discardFilters}
+                filteredDiscards={filteredDiscards}
+                onFiltersChange={setDiscardFilters}
+              />
+            </aside>
+
             <PokerTable
               state={state}
               currentPlayer={currentPlayer}
               viewerPlayerId={viewer.id}
               revealAll={revealAll}
               canActForCurrentPlayer={canActForCurrentPlayer}
-              tableFocus={tableFocus}
               selectedCard={selectedCard}
               cluePreview={cluePreview}
               clueHistory={clueHistory}
               feedback={tableFeedback}
-              onTableFocusChange={setTableFocus}
               onSelectedCardChange={setSelectedCard}
               onAction={perform}
             />
@@ -1048,15 +1064,7 @@ export function App() {
                 onCluePreviewChange={setCluePreview}
                 onAction={perform}
               />
-              <TableInfoPanel
-                focus={tableFocus}
-                state={state}
-                viewerPlayerId={viewer.id}
-                revealAll={revealAll}
-                filters={discardFilters}
-                filteredDiscards={filteredDiscards}
-                onFiltersChange={setDiscardFilters}
-              />
+              <ObjectivesPanel state={state} />
               <EventLogPanel events={activeEvents} />
             </aside>
           </div>
@@ -1963,12 +1971,10 @@ function PokerTable({
   viewerPlayerId,
   revealAll,
   canActForCurrentPlayer,
-  tableFocus,
   selectedCard,
   cluePreview,
   clueHistory,
   feedback,
-  onTableFocusChange,
   onSelectedCardChange,
   onAction
 }: {
@@ -1977,12 +1983,10 @@ function PokerTable({
   viewerPlayerId: string;
   revealAll: boolean;
   canActForCurrentPlayer: boolean;
-  tableFocus: TableFocus;
   selectedCard: CardSelection;
   cluePreview: CluePreview;
   clueHistory: ClueEntry[];
   feedback: TableFeedback | null;
-  onTableFocusChange: (focus: TableFocus) => void;
   onSelectedCardChange: (selection: CardSelection) => void;
   onAction: (action: GameAction) => void;
 }) {
@@ -2018,7 +2022,6 @@ function PokerTable({
           <div className="center-tableau">
             <Blueprints state={state} feedback={feedback} />
           </div>
-          <TableObjects state={state} selected={tableFocus} feedback={feedback} onSelect={onTableFocusChange} />
           <DraftRow
             state={state}
             currentPlayer={currentPlayer}
@@ -2205,10 +2208,16 @@ function TableObjects({
   onSelect: (focus: TableFocus) => void;
 }) {
   const topDiscard = state.discardPile[state.discardPile.length - 1];
-  const score = scoreGame(state);
 
   return (
-    <div className="table-objects" aria-label="Table piles">
+    <section className="table-objects panel-section" aria-label="Table piles">
+      <div className="pile-rail-heading">
+        <div>
+          <span className="panel-kicker">Card supply</span>
+          <h2>Table piles</h2>
+        </div>
+        <small>Tap to inspect</small>
+      </div>
       <button
         type="button"
         className={`table-object${selected === "deck" ? " active" : ""}${feedback?.kind === "drawn" ? " pulse-draw" : ""}`}
@@ -2240,23 +2249,7 @@ function TableObjects({
           <small>{state.discardPile.length} cards</small>
         </span>
       </button>
-
-      <button
-        type="button"
-        className={selected === "objectives" ? "table-object active" : "table-object"}
-        onClick={() => onSelect("objectives")}
-        aria-pressed={selected === "objectives"}
-      >
-        <span className="pile-art contract-pile" aria-hidden="true">
-          <span />
-          <span />
-        </span>
-        <span className="pile-copy">
-          <strong>Contracts</strong>
-          <small>+{score.objectiveScore} points</small>
-        </span>
-      </button>
-    </div>
+    </section>
   );
 }
 
@@ -2776,10 +2769,6 @@ function TableInfoPanel({
         </p>
       </section>
     );
-  }
-
-  if (focus === "objectives") {
-    return <ObjectivesPanel state={state} />;
   }
 
   return (

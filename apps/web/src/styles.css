@@ -7859,3 +7859,326 @@ dd {
     height: 9px;
   }
 }
+
+/* Three-column table: piles | play surface | command rail */
+
+.game-screen .game-layout {
+  grid-template-areas: "piles table commands";
+  grid-template-columns: minmax(250px, 290px) minmax(0, 1fr) 360px;
+  gap: 11px;
+}
+
+.game-screen .pile-rail {
+  grid-area: piles;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 9px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.game-screen .table-stage {
+  grid-area: table;
+}
+
+.game-screen .command-rail {
+  grid-area: commands;
+}
+
+.game-screen .pile-rail .panel-section {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 17px;
+  background:
+    linear-gradient(145deg, var(--game-paper-high), var(--game-paper-low)),
+    var(--game-paper);
+  color: var(--game-paper-ink);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 20px 48px rgba(0, 0, 0, 0.25);
+}
+
+.game-screen .pile-rail .table-objects {
+  position: relative;
+  display: grid;
+  grid-area: auto;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  overflow: hidden;
+}
+
+.game-screen .pile-rail .table-objects::before,
+.game-screen .pile-rail .table-info-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: linear-gradient(90deg, #36a89c, #f2b74d 58%, #ed7164);
+}
+
+.pile-rail-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 1px 1px;
+}
+
+.pile-rail-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.pile-rail-heading h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #122f34;
+  font-size: 1.05rem;
+}
+
+.pile-rail-heading small {
+  color: var(--game-paper-muted);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.game-screen .pile-rail .table-object {
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 11px;
+  min-height: 76px;
+  padding: 8px 11px;
+  border: 1px solid rgba(19, 70, 76, 0.2);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 12% 20%, rgba(67, 188, 174, 0.13), transparent 46%),
+    #17343c;
+  color: #f5fbf8;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 8px 18px rgba(8, 31, 36, 0.15);
+}
+
+.game-screen .pile-rail .table-object:hover:not(:disabled),
+.game-screen .pile-rail .table-object.active {
+  border-color: rgba(242, 183, 77, 0.72);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(242, 183, 77, 0.16), transparent 48%),
+    #1b3d44;
+  box-shadow:
+    inset 0 0 0 1px rgba(242, 183, 77, 0.12),
+    0 12px 24px rgba(8, 31, 36, 0.22);
+}
+
+.game-screen .pile-rail .pile-art {
+  width: 56px;
+  height: 62px;
+}
+
+.game-screen .pile-rail .deck-pile span,
+.game-screen .pile-rail .empty-pile {
+  width: 40px;
+  height: 54px;
+  border-radius: 9px;
+}
+
+.game-screen .pile-rail .pile-top-card {
+  width: 43px;
+  height: 56px;
+  border-radius: 9px;
+}
+
+.game-screen .pile-rail .pile-top-card .shape-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.game-screen .pile-rail .pile-top-rank {
+  right: 4px;
+  bottom: 4px;
+  min-width: 15px;
+  height: 15px;
+  font-size: 0.58rem;
+}
+
+.game-screen .pile-rail .pile-copy {
+  gap: 5px;
+}
+
+.game-screen .pile-rail .pile-copy strong {
+  color: #fffdf7;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+}
+
+.game-screen .pile-rail .pile-copy small {
+  color: #9db7bb;
+  font-size: 0.65rem;
+}
+
+.game-screen .pile-rail .table-info-panel {
+  position: relative;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.game-screen .pile-rail .muted,
+.game-screen .pile-rail .section-note,
+.game-screen .pile-rail .pile-composition-heading span,
+.game-screen .pile-rail .compact-muted {
+  color: var(--game-paper-muted);
+}
+
+.game-screen .pile-rail .draw-back-grid,
+.game-screen .pile-rail .composition-table,
+.game-screen .pile-rail .pile-stat-grid div,
+.game-screen .pile-rail .pile-meta-row span,
+.game-screen .pile-rail .rank-mark-chip {
+  border-color: rgba(18, 50, 56, 0.16);
+  background: rgba(215, 226, 222, 0.46);
+  color: var(--game-paper-ink);
+  box-shadow: none;
+}
+
+.game-screen .pile-rail select {
+  border-color: rgba(18, 50, 56, 0.22);
+  background-color: #18363d;
+  color: #eef7f4;
+  color-scheme: dark;
+}
+
+.game-screen .table-center {
+  grid-template-areas:
+    "tokens"
+    "blueprints"
+    "draft"
+    "actions";
+  grid-template-columns: minmax(0, 1fr);
+  width: min(100%, 790px);
+}
+
+@media (max-width: 1450px) {
+  .game-screen .game-layout {
+    grid-template-columns: 225px minmax(0, 1fr) 330px;
+  }
+
+  .game-screen .pile-rail .table-object {
+    grid-template-columns: 48px minmax(0, 1fr);
+    min-height: 66px;
+    padding-inline: 8px;
+  }
+
+  .game-screen .pile-rail .pile-art {
+    width: 45px;
+    height: 52px;
+  }
+
+  .game-screen .pile-rail .deck-pile span,
+  .game-screen .pile-rail .empty-pile {
+    width: 33px;
+    height: 45px;
+  }
+
+  .game-screen .pile-rail .pile-top-card {
+    width: 35px;
+    height: 47px;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-screen .game-layout {
+    grid-template-areas:
+      "table"
+      "piles"
+      "commands";
+    grid-template-columns: 1fr;
+  }
+
+  .game-screen .pile-rail {
+    grid-template-rows: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .game-screen .pile-rail .table-objects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .game-screen .pile-rail .pile-rail-heading {
+    grid-column: 1 / -1;
+  }
+
+  .game-screen .pile-rail .table-info-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 740px) {
+  .game-screen .game-layout {
+    grid-template-rows: minmax(0, 1fr) 58px 178px;
+  }
+
+  .game-screen .pile-rail .table-objects {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    height: 58px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .game-screen .pile-rail .pile-rail-heading {
+    display: none;
+  }
+
+  .game-screen .pile-rail .table-object {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 5px;
+    min-height: 48px;
+    padding: 3px 6px;
+    border-radius: 8px;
+  }
+
+  .game-screen .pile-rail .pile-art {
+    width: 27px;
+    height: 36px;
+  }
+
+  .game-screen .pile-rail .deck-pile span,
+  .game-screen .pile-rail .empty-pile {
+    width: 22px;
+    height: 30px;
+    border-radius: 5px;
+  }
+
+  .game-screen .pile-rail .pile-top-card {
+    width: 23px;
+    height: 31px;
+    border-radius: 5px;
+  }
+
+  .game-screen .pile-rail .pile-top-card .shape-icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  .game-screen .pile-rail .pile-copy {
+    gap: 1px;
+  }
+
+  .game-screen .pile-rail .pile-copy strong {
+    font-size: 0.72rem;
+  }
+
+  .game-screen .pile-rail .pile-copy small {
+    font-size: 0.5rem;
+  }
+
+  .game-screen .command-rail > .event-log-panel {
+    display: none;
+  }
+}
