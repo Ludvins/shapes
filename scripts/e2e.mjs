@@ -349,12 +349,16 @@ async function main() {
   await runTest("local draw pile shows hidden card backs", async () => {
     const page = await newPage(remotePort, webUrl);
     await page.waitFor("document.body.innerText.includes('Shapes')");
-    await page.clickButton("Start table");
+    await page.fillLabel("Your name", "Mira");
+    await page.clickButton("Start local");
     await page.waitFor("document.body.innerText.toLowerCase().includes('action tray')");
+    assert((await page.text()).includes("Mira's Turn"), "Expected the local table to use the entered player name.");
     await page.clickButton("Draw");
     await page.waitFor("document.body.innerText.includes('Draw Pile')");
     assert((await page.count(".deck-panel .draw-back-card")) === 35, "Expected 35 hidden draw card backs.");
     assert((await page.text()).includes("Unseen pool"), "Expected unseen pool summary.");
+    await page.clickButton("New game");
+    await page.waitFor("Boolean(document.querySelector('[role=\"dialog\"]')) && document.body.innerText.toLowerCase().includes('your name') && document.body.innerText.includes('Start new game')");
     assert(page.errors.length === 0, `Console errors: ${page.errors.join("\n")}`);
   });
 
@@ -362,14 +366,12 @@ async function main() {
   let roomCode = "";
   let inviteLink = "";
 
-  await runTest("host creates room and guest joins by invite link", async () => {
-    const host = await newPage(remotePort, webUrl);
-    await host.clickButton("Play online");
-    await host.waitFor("document.body.innerText.includes('Bring everyone to the table')");
-    await host.fillLabel("Name", "Ada");
-    await host.fillLabel("Server", serverUrl);
+  await runTest("host creates room and guest joins by lobby code", async () => {
+    const welcomeUrl = `${webUrl}/?server=${encodeURIComponent(serverUrl)}`;
+    const host = await newPage(remotePort, welcomeUrl);
+    await host.fillLabel("Your name", "Ada");
     await host.fillLabel("Seats", "2");
-    await host.clickButton("Create lobby");
+    await host.clickButton("Create table");
     await host.waitFor("Boolean(document.querySelector('.lobby-code-card'))");
 
     roomCode = await host.evaluate("document.querySelector('.lobby-code-card strong').textContent.trim()");
@@ -381,10 +383,10 @@ async function main() {
     assert(inviteLink.includes(`room=${roomCode}`), "Expected invite link to include short room code.");
     assert(inviteLink.includes(encodeURIComponent(serverUrl)), "Expected invite link to include encoded server URL.");
 
-    const guest = await newPage(remotePort, inviteLink);
-    await guest.waitFor("document.body.innerText.includes('Bring everyone to the table')");
-    await guest.fillLabel("Name", "Ben");
-    await guest.clickButton("Join lobby");
+    const guest = await newPage(remotePort, welcomeUrl);
+    await guest.fillLabel("Your name", "Ben");
+    await guest.fillLabel("Lobby code", roomCode);
+    await guest.clickButton("Join table");
     await guest.waitFor("Boolean(document.querySelector('.lobby-code-card')) && document.body.innerText.includes('Ben')");
     await host.waitFor("document.body.innerText.includes('Ben')");
 

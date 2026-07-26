@@ -92,6 +92,7 @@ interface DiscardFilters {
 interface SavedSession {
   version: 2;
   playerCount: number;
+  localPlayerName?: string;
   seed: string;
   setup: GameSetup;
   events: GameEvent[];
@@ -124,9 +125,12 @@ function newSeed(): string {
   return `local-${Date.now().toString(36)}`;
 }
 
-function startLocalGame(playerCount: number, seed = newSeed()): GameSetup {
+function startLocalGame(playerCount: number, seed = newSeed(), playerName = DEFAULT_NAMES[0]): GameSetup {
+  const normalizedName = playerName.trim() || "Player";
+  const remainingNames = DEFAULT_NAMES.filter((name) => name.toLowerCase() !== normalizedName.toLowerCase());
+
   return createGame({
-    playerNames: DEFAULT_NAMES.slice(0, playerCount),
+    playerNames: [normalizedName, ...remainingNames].slice(0, playerCount),
     seed,
     objectiveCount: 2
   });
@@ -152,6 +156,14 @@ function readInviteParams(): InviteParams | null {
     serverUrl: params.get("server") || DEFAULT_SERVER_URL,
     roomId
   };
+}
+
+function readInitialServerUrl(): string {
+  if (typeof window === "undefined") {
+    return DEFAULT_SERVER_URL;
+  }
+
+  return new URLSearchParams(window.location.search).get("server") || DEFAULT_SERVER_URL;
 }
 
 function buildInviteLink(serverUrl: string, roomId: string): string {
@@ -363,10 +375,14 @@ function playFeedbackCue(cue: FeedbackCue, enabled: boolean): void {
 
 export function App() {
   const inviteParams = useMemo(() => readInviteParams(), []);
+  const initialServerUrl = useMemo(() => readInitialServerUrl(), []);
   const [appView, setAppView] = useState<AppView>(inviteParams ? "table" : "welcome");
   const [mode, setMode] = useState<AppMode>(inviteParams ? "online" : "local");
   const [hasLocalSave, setHasLocalSave] = useState(Boolean(savedSession));
   const [playerCount, setPlayerCount] = useState(savedSession?.playerCount ?? 3);
+  const [localPlayerName, setLocalPlayerName] = useState(
+    savedSession?.localPlayerName ?? savedSession?.setup.state.players[0]?.name ?? DEFAULT_NAMES[0]
+  );
   const [seed, setSeed] = useState(savedSession?.seed ?? "first-build");
   const [setup, setSetup] = useState<GameSetup>(() => savedSession?.setup ?? startLocalGame(3, "first-build"));
   const [events, setEvents] = useState<GameEvent[]>(() => savedSession?.events ?? setup.events);
@@ -378,7 +394,7 @@ export function App() {
   const [discardFilters, setDiscardFilters] = useState<DiscardFilters>(
     savedSession?.discardFilters ?? EMPTY_DISCARD_FILTERS
   );
-  const [serverUrl, setServerUrl] = useState(inviteParams?.serverUrl ?? DEFAULT_SERVER_URL);
+  const [serverUrl, setServerUrl] = useState(inviteParams?.serverUrl ?? initialServerUrl);
   const [onlineName, setOnlineName] = useState("Ada");
   const [onlineExpectedPlayerCount, setOnlineExpectedPlayerCount] = useState(3);
   const [onlineJoinRoomId, setOnlineJoinRoomId] = useState(inviteParams?.roomId ?? "");
@@ -451,6 +467,7 @@ export function App() {
     const session: SavedSession = {
       version: 2,
       playerCount,
+      localPlayerName,
       seed,
       setup,
       events,
@@ -462,7 +479,19 @@ export function App() {
 
     window.localStorage.setItem(LOCAL_SAVE_KEY, JSON.stringify(session));
     setHasLocalSave(true);
-  }, [appView, discardFilters, events, followTurn, mode, playerCount, revealAll, seed, setup, viewerPlayerId]);
+  }, [
+    appView,
+    discardFilters,
+    events,
+    followTurn,
+    localPlayerName,
+    mode,
+    playerCount,
+    revealAll,
+    seed,
+    setup,
+    viewerPlayerId
+  ]);
 
   useEffect(() => {
     window.localStorage.setItem(SOUND_SAVE_KEY, String(soundEnabled));
@@ -581,7 +610,7 @@ export function App() {
   }
 
   function resetGame(nextSeed = seed) {
-    const next = startLocalGame(playerCount, nextSeed || newSeed());
+    const next = startLocalGame(playerCount, nextSeed || newSeed(), localPlayerName);
     setSetup(next);
     setEvents(next.events);
     setViewerPlayerId(next.state.players[0].id);
@@ -591,11 +620,13 @@ export function App() {
     setError(null);
   }
 
-  function startFreshLocalGame(nextPlayerCount: number) {
+  function startFreshLocalGame(nextPlayerCount: number, playerName: string) {
     const nextSeed = newSeed();
-    const next = startLocalGame(nextPlayerCount, nextSeed);
+    const normalizedName = playerName.trim() || "Player";
+    const next = startLocalGame(nextPlayerCount, nextSeed, normalizedName);
     setMode("local");
     setPlayerCount(nextPlayerCount);
+    setLocalPlayerName(normalizedName);
     setSeed(nextSeed);
     setSetup(next);
     setEvents(next.events);
@@ -618,7 +649,10 @@ export function App() {
     setAppView("table");
   }
 
-  async function createRoom() {
+  async function createRoom(
+    requestedName = onlineName,
+    requestedPlayerCount = onlineExpectedPlayerCount
+  ) {
     if (onlineBusy !== "idle") {
       return;
     }
@@ -626,8 +660,8 @@ export function App() {
     setOnlineBusy("creating");
     try {
       const room = await createOnlineRoom(serverUrl, {
-        hostName: onlineName.trim() || "Player",
-        expectedPlayerCount: onlineExpectedPlayerCount,
+        hostName: requestedName.trim() || "Player",
+        expectedPlayerCount: requestedPlayerCount,
         seed: seed.trim() || undefined
       });
       setOnlineRoom(room);
@@ -643,15 +677,15 @@ export function App() {
     }
   }
 
-  async function joinRoom() {
+  async function joinRoom(requestedName = onlineName, requestedRoomId = onlineJoinRoomId) {
     if (onlineBusy !== "idle") {
       return;
     }
 
     setOnlineBusy("joining");
     try {
-      const name = onlineName.trim() || "Player";
-      const room = await joinOnlineRoom(serverUrl, onlineJoinRoomId.trim(), { playerName: name });
+      const name = requestedName.trim() || "Player";
+      const room = await joinOnlineRoom(serverUrl, requestedRoomId.trim(), { playerName: name });
       const joinedPlayer =
         room.players.find((player) => player.id === room.viewerRoomPlayerId) ??
         room.players.find((player) => player.name === name) ??
@@ -666,6 +700,31 @@ export function App() {
     } finally {
       setOnlineBusy("idle");
     }
+  }
+
+  function createOnlineFromWelcome(playerName: string, expectedPlayerCount: number) {
+    const normalizedName = playerName.trim() || "Player";
+    setMode("online");
+    setOnlineName(normalizedName);
+    setOnlineExpectedPlayerCount(expectedPlayerCount);
+    setOnlineRoom(null);
+    setOnlinePlayerId("");
+    setError(null);
+    setAppView("table");
+    void createRoom(normalizedName, expectedPlayerCount);
+  }
+
+  function joinOnlineFromWelcome(playerName: string, roomCode: string) {
+    const normalizedName = playerName.trim() || "Player";
+    const normalizedCode = roomCode.trim().toUpperCase();
+    setMode("online");
+    setOnlineName(normalizedName);
+    setOnlineJoinRoomId(normalizedCode);
+    setOnlineRoom(null);
+    setOnlinePlayerId("");
+    setError(null);
+    setAppView("table");
+    void joinRoom(normalizedName, normalizedCode);
   }
 
   async function startRoom() {
@@ -773,11 +832,14 @@ export function App() {
         <WelcomeScreen
           hasSavedGame={hasLocalSave}
           savedPlayerCount={playerCount}
+          defaultPlayerName={localPlayerName}
           onResume={() => {
             setMode("local");
             setAppView("table");
           }}
           onStartLocal={startFreshLocalGame}
+          onCreateOnline={createOnlineFromWelcome}
+          onJoinOnline={joinOnlineFromWelcome}
           onPlayOnline={openOnlinePlay}
           onShowRules={() => setShowRules(true)}
         />
@@ -835,7 +897,7 @@ export function App() {
                   ))}
                 </select>
               </label>
-              <button type="button" onClick={() => resetGame(seed)}>
+              <button type="button" onClick={() => setShowSetup(true)}>
                 New game
               </button>
               <button type="button" className="secondary-button" onClick={() => setShowSetup(true)}>
@@ -865,11 +927,13 @@ export function App() {
         <SetupDrawer
           mode={mode}
           playerCount={playerCount}
+          localPlayerName={localPlayerName}
           seed={seed}
           serverUrl={serverUrl}
           onlineName={onlineName}
-          canChangePlayerCount={state.turn <= 1 || state.phase !== "playing"}
+          canChangePlayerCount
           onPlayerCountChange={setPlayerCount}
+          onLocalPlayerNameChange={setLocalPlayerName}
           onSeedChange={setSeed}
           onServerUrlChange={setServerUrl}
           onOnlineNameChange={setOnlineName}
@@ -985,19 +1049,30 @@ export function App() {
 function WelcomeScreen({
   hasSavedGame,
   savedPlayerCount,
+  defaultPlayerName,
   onResume,
   onStartLocal,
+  onCreateOnline,
+  onJoinOnline,
   onPlayOnline,
   onShowRules
 }: {
   hasSavedGame: boolean;
   savedPlayerCount: number;
+  defaultPlayerName: string;
   onResume: () => void;
-  onStartLocal: (playerCount: number) => void;
+  onStartLocal: (playerCount: number, playerName: string) => void;
+  onCreateOnline: (playerName: string, expectedPlayerCount: number) => void;
+  onJoinOnline: (playerName: string, roomCode: string) => void;
   onPlayOnline: () => void;
   onShowRules: () => void;
 }) {
+  const [welcomePlayerName, setWelcomePlayerName] = useState(defaultPlayerName);
   const [welcomePlayerCount, setWelcomePlayerCount] = useState(3);
+  const [welcomeOnlineSeats, setWelcomeOnlineSeats] = useState(3);
+  const [welcomeRoomCode, setWelcomeRoomCode] = useState("");
+  const hasPlayerName = welcomePlayerName.trim().length > 0;
+  const normalizedRoomCode = welcomeRoomCode.trim().toUpperCase();
   const previewCards: Card[] = [
     { id: "welcome-circle", shape: "circle", rank: 2, pattern: "solid" },
     { id: "welcome-triangle", shape: "triangle", rank: 3, pattern: "striped" },
@@ -1036,34 +1111,114 @@ function WelcomeScreen({
           </p>
 
           <div className="welcome-actions">
-            <div className="local-start-card">
-              <label htmlFor="welcome-player-count">Players</label>
-              <select
-                id="welcome-player-count"
-                value={welcomePlayerCount}
-                onChange={(event) => setWelcomePlayerCount(Number(event.target.value))}
-              >
-                {[2, 3, 4, 5].map((count) => (
-                  <option key={count} value={count}>
-                    {count} players
-                  </option>
-                ))}
-              </select>
-              <button type="button" onClick={() => onStartLocal(welcomePlayerCount)}>
-                Start table <span aria-hidden="true">→</span>
-              </button>
-            </div>
             {hasSavedGame ? (
               <button type="button" className="resume-button" onClick={onResume}>
                 <span>Resume saved table</span>
                 <small>{savedPlayerCount} players · saved on this device</small>
               </button>
-            ) : (
-              <button type="button" className="resume-button" onClick={onPlayOnline}>
-                <span>Create or join a room</span>
-                <small>Invite friends with a private link</small>
-              </button>
-            )}
+            ) : null}
+
+            <div className="welcome-launchpad">
+              <label className="welcome-name-field" htmlFor="welcome-player-name">
+                <span>
+                  <strong>Your name</strong>
+                  <small>Everyone at the table will see this.</small>
+                </span>
+                <input
+                  id="welcome-player-name"
+                  value={welcomePlayerName}
+                  onChange={(event) => setWelcomePlayerName(event.target.value)}
+                  placeholder="Enter your name"
+                  autoComplete="nickname"
+                  maxLength={24}
+                />
+              </label>
+
+              <div className="welcome-launch-options">
+                <article className="welcome-launch-card local">
+                  <div>
+                    <small>Same screen</small>
+                    <strong>Local game</strong>
+                  </div>
+                  <label htmlFor="welcome-player-count">
+                    Players
+                    <select
+                      id="welcome-player-count"
+                      value={welcomePlayerCount}
+                      onChange={(event) => setWelcomePlayerCount(Number(event.target.value))}
+                    >
+                      {[2, 3, 4, 5].map((count) => (
+                        <option key={count} value={count}>
+                          {count} players
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!hasPlayerName}
+                    onClick={() => onStartLocal(welcomePlayerCount, welcomePlayerName)}
+                  >
+                    Start local
+                  </button>
+                </article>
+
+                <article className="welcome-launch-card online">
+                  <div>
+                    <small>Private room</small>
+                    <strong>Online game</strong>
+                  </div>
+                  <label htmlFor="welcome-online-seats">
+                    Seats
+                    <select
+                      id="welcome-online-seats"
+                      value={welcomeOnlineSeats}
+                      onChange={(event) => setWelcomeOnlineSeats(Number(event.target.value))}
+                    >
+                      {[2, 3, 4, 5].map((count) => (
+                        <option key={count} value={count}>
+                          {count} players
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!hasPlayerName}
+                    onClick={() => onCreateOnline(welcomePlayerName, welcomeOnlineSeats)}
+                  >
+                    Create table
+                  </button>
+                </article>
+              </div>
+
+              <div className="welcome-join-row">
+                <span>
+                  <small>Already invited?</small>
+                  <strong>Enter an existing game</strong>
+                </span>
+                <label htmlFor="welcome-room-code">
+                  Lobby code
+                  <input
+                    id="welcome-room-code"
+                    value={welcomeRoomCode}
+                    onChange={(event) => setWelcomeRoomCode(event.target.value.toUpperCase())}
+                    placeholder="HEX-154"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={16}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!hasPlayerName || normalizedRoomCode.length === 0}
+                  onClick={() => onJoinOnline(welcomePlayerName, normalizedRoomCode)}
+                >
+                  Join table
+                </button>
+              </div>
+            </div>
           </div>
 
           <dl className="welcome-facts">
@@ -1360,11 +1515,13 @@ function OnlineLobby({
 function SetupDrawer({
   mode,
   playerCount,
+  localPlayerName,
   seed,
   serverUrl,
   onlineName,
   canChangePlayerCount,
   onPlayerCountChange,
+  onLocalPlayerNameChange,
   onSeedChange,
   onServerUrlChange,
   onOnlineNameChange,
@@ -1374,11 +1531,13 @@ function SetupDrawer({
 }: {
   mode: AppMode;
   playerCount: number;
+  localPlayerName: string;
   seed: string;
   serverUrl: string;
   onlineName: string;
   canChangePlayerCount: boolean;
   onPlayerCountChange: (count: number) => void;
+  onLocalPlayerNameChange: (name: string) => void;
   onSeedChange: (seed: string) => void;
   onServerUrlChange: (serverUrl: string) => void;
   onOnlineNameChange: (name: string) => void;
@@ -1402,6 +1561,16 @@ function SetupDrawer({
         {mode === "local" ? (
           <div className="setup-grid">
             <label>
+              Your name
+              <input
+                value={localPlayerName}
+                onChange={(event) => onLocalPlayerNameChange(event.target.value)}
+                placeholder="How should the table know you?"
+                autoComplete="nickname"
+                maxLength={24}
+              />
+            </label>
+            <label>
               Players
               <select
                 value={playerCount}
@@ -1421,7 +1590,7 @@ function SetupDrawer({
             </label>
             <div className="dialog-actions">
               <button type="button" onClick={onRandomSeed}>
-                Random seed
+                Start new game
               </button>
               <button type="button" className="secondary-button" onClick={onClearSave}>
                 Clear save
