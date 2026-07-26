@@ -2774,11 +2774,6 @@ function CardFace({ card, handCard }: { card: Card; handCard?: HandCard }) {
       <CardCorner card={card} />
       <div className="card-center">
         <ShapeIcon shape={card.shape} pattern={card.pattern} />
-        <strong>{card.rank}</strong>
-      </div>
-      <div className="card-meta">
-        <span>{formatShape(card.shape)}</span>
-        <span>{formatPattern(card.pattern)}</span>
       </div>
       <CardCorner card={card} flipped />
       {known ? <KnowledgeMarks known={known} compact /> : null}
@@ -2790,7 +2785,7 @@ function CardCorner({ card, flipped = false }: { card: Card; flipped?: boolean }
   return (
     <div className={flipped ? "card-corner bottom" : "card-corner"}>
       <span>{card.rank}</span>
-      <ShapeIcon shape={card.shape} pattern={card.pattern} />
+      <ShapeIcon shape={card.shape} />
     </div>
   );
 }
