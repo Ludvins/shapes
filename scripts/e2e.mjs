@@ -349,6 +349,8 @@ async function main() {
   await runTest("local draw pile shows hidden card backs", async () => {
     const page = await newPage(remotePort, webUrl);
     await page.waitFor("document.body.innerText.includes('Shapes')");
+    await page.clickButton("Start table");
+    await page.waitFor("document.body.innerText.toLowerCase().includes('action tray')");
     await page.clickButton("Draw");
     await page.waitFor("document.body.innerText.includes('Draw Pile')");
     assert((await page.count(".deck-panel .draw-back-card")) === 35, "Expected 35 hidden draw card backs.");
@@ -362,7 +364,8 @@ async function main() {
 
   await runTest("host creates room and guest joins by invite link", async () => {
     const host = await newPage(remotePort, webUrl);
-    await host.fillLabel("Mode", "online");
+    await host.clickButton("Play online");
+    await host.waitFor("document.body.innerText.includes('Online Room')");
     await host.fillLabel("Name", "Ada");
     await host.fillLabel("Server", serverUrl);
     await host.clickButton("Create room");

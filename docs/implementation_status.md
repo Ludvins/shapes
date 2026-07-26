@@ -11,26 +11,20 @@
 - Objective scoring for the first starter objective set.
 - Unit and simulation tests.
 - Local web prototype with hidden-card perspective, clue counts, clue history, discard filters, score panel, draft row, and localStorage recovery.
-- In-memory multiplayer server with room lifecycle, stale version rejection, hidden player views, and SSE room streams.
+- Multiplayer server with room lifecycle, JSON persistence, stale version rejection, hidden player views, and SSE room streams.
+- Public welcome experience with local, resume, and online entry paths.
+- Responsive table UI, sound cues, animated action feedback, rules, and accessible labels.
+- Repeatable multi-strategy balance simulation across every supported player count.
 
 ## Not Done Yet
 
-- Real persistent backend storage.
+- Durable managed backend storage.
 - Production authentication.
 - Deployed multiplayer web flow.
 - External playtest feedback form.
-- Tutorial.
 - Account history and profiles.
 - Mobile app.
 
 ## Recommended Next Engineering Step
 
-Integrate `apps/web` with `apps/server` behind a mode switch:
-
-```text
-Local Table
-Online Room
-```
-
-The online room mode should use the existing server endpoints first, then replace the in-memory room store with Supabase once the client flow is correct.
-
+Deploy the web client and multiplayer server, then collect structured playtest feedback before adding accounts or progression.

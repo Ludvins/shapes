@@ -62,6 +62,7 @@ const PATTERN_PALETTE: VisualPalette = {
 };
 
 type AppMode = "local" | "online";
+type AppView = "welcome" | "table";
 type GameSetup = { state: GameState; events: GameEvent[] };
 type FilterValue<T extends string | number> = "all" | T;
 type TableFocus = "deck" | "discard" | "objectives";
@@ -362,7 +363,9 @@ function playFeedbackCue(cue: FeedbackCue, enabled: boolean): void {
 
 export function App() {
   const inviteParams = useMemo(() => readInviteParams(), []);
+  const [appView, setAppView] = useState<AppView>(inviteParams ? "table" : "welcome");
   const [mode, setMode] = useState<AppMode>(inviteParams ? "online" : "local");
+  const [hasLocalSave, setHasLocalSave] = useState(Boolean(savedSession));
   const [playerCount, setPlayerCount] = useState(savedSession?.playerCount ?? 3);
   const [seed, setSeed] = useState(savedSession?.seed ?? "first-build");
   const [setup, setSetup] = useState<GameSetup>(() => savedSession?.setup ?? startLocalGame(3, "first-build"));
@@ -440,6 +443,10 @@ export function App() {
   }, [currentPlayer.id, followTurn, mode]);
 
   useEffect(() => {
+    if (appView !== "table" || mode !== "local") {
+      return;
+    }
+
     const session: SavedSession = {
       version: 2,
       playerCount,
@@ -453,7 +460,8 @@ export function App() {
     };
 
     window.localStorage.setItem(LOCAL_SAVE_KEY, JSON.stringify(session));
-  }, [discardFilters, events, followTurn, playerCount, revealAll, seed, setup, viewerPlayerId]);
+    setHasLocalSave(true);
+  }, [appView, discardFilters, events, followTurn, mode, playerCount, revealAll, seed, setup, viewerPlayerId]);
 
   useEffect(() => {
     window.localStorage.setItem(SOUND_SAVE_KEY, String(soundEnabled));
@@ -580,6 +588,33 @@ export function App() {
     setCluePreview(null);
     setTableFocus("objectives");
     setError(null);
+  }
+
+  function startFreshLocalGame(nextPlayerCount: number) {
+    const nextSeed = newSeed();
+    const next = startLocalGame(nextPlayerCount, nextSeed);
+    setMode("local");
+    setPlayerCount(nextPlayerCount);
+    setSeed(nextSeed);
+    setSetup(next);
+    setEvents(next.events);
+    setViewerPlayerId(next.state.players[0].id);
+    setFollowTurn(true);
+    setRevealAll(false);
+    setSelectedCard(null);
+    setCluePreview(null);
+    setTableFocus("objectives");
+    setError(null);
+    setAppView("table");
+  }
+
+  function openOnlinePlay() {
+    setMode("online");
+    setOnlineRoom(null);
+    setOnlinePlayerId("");
+    setOnlineBusy("idle");
+    setError(null);
+    setAppView("table");
   }
 
   async function createRoom() {
@@ -711,6 +746,7 @@ export function App() {
 
   function clearSavedGame() {
     window.localStorage.removeItem(LOCAL_SAVE_KEY);
+    setHasLocalSave(false);
     setError("Local save cleared. The current table stays open until you start a new game.");
   }
 
@@ -729,13 +765,39 @@ export function App() {
     }
   }
 
+  if (appView === "welcome") {
+    return (
+      <main className="welcome-shell">
+        <WelcomeScreen
+          hasSavedGame={hasLocalSave}
+          savedPlayerCount={playerCount}
+          onResume={() => {
+            setMode("local");
+            setAppView("table");
+          }}
+          onStartLocal={startFreshLocalGame}
+          onPlayOnline={openOnlinePlay}
+          onShowRules={() => setShowRules(true)}
+        />
+        {showRules ? <RulesDrawer onClose={() => setShowRules(false)} /> : null}
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <section className="top-bar">
-        <div>
-          <p className="eyebrow">Local Alpha Prototype</p>
-          <h1>Shapes</h1>
-        </div>
+        <button type="button" className="brand-lockup" onClick={() => setAppView("welcome")} aria-label="Back to Shapes home">
+          <span className="brand-mark" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span>
+            <span className="eyebrow">Cooperative deduction game</span>
+            <span className="brand-title">Shapes</span>
+          </span>
+        </button>
         <div className="setup-controls" aria-label="Game setup">
           <label>
             Mode
@@ -922,6 +984,159 @@ export function App() {
         </>
       ) : null}
     </main>
+  );
+}
+
+function WelcomeScreen({
+  hasSavedGame,
+  savedPlayerCount,
+  onResume,
+  onStartLocal,
+  onPlayOnline,
+  onShowRules
+}: {
+  hasSavedGame: boolean;
+  savedPlayerCount: number;
+  onResume: () => void;
+  onStartLocal: (playerCount: number) => void;
+  onPlayOnline: () => void;
+  onShowRules: () => void;
+}) {
+  const [welcomePlayerCount, setWelcomePlayerCount] = useState(3);
+  const previewCards: Card[] = [
+    { id: "welcome-circle", shape: "circle", rank: 2, pattern: "solid" },
+    { id: "welcome-triangle", shape: "triangle", rank: 3, pattern: "striped" },
+    { id: "welcome-hexagon", shape: "hexagon", rank: 4, pattern: "hollow" }
+  ];
+
+  return (
+    <div className="welcome-page">
+      <nav className="welcome-nav" aria-label="Shapes navigation">
+        <div className="welcome-brand">
+          <span className="brand-mark large" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          <span>Shapes</span>
+        </div>
+        <div>
+          <button type="button" className="welcome-link" onClick={onShowRules}>
+            How to play
+          </button>
+          <button type="button" className="welcome-online-button" onClick={onPlayOnline}>
+            Play online
+          </button>
+        </div>
+      </nav>
+
+      <section className="welcome-hero">
+        <div className="welcome-copy">
+          <p className="welcome-eyebrow">
+            <span aria-hidden="true">◆</span> A cooperative game of hidden hands
+          </p>
+          <h1>See every card.<br />Except your own.</h1>
+          <p className="welcome-lede">
+            Share precise clues, read the table, and build five geometric blueprints together before the design cracks.
+          </p>
+
+          <div className="welcome-actions">
+            <div className="local-start-card">
+              <label htmlFor="welcome-player-count">Players</label>
+              <select
+                id="welcome-player-count"
+                value={welcomePlayerCount}
+                onChange={(event) => setWelcomePlayerCount(Number(event.target.value))}
+              >
+                {[2, 3, 4, 5].map((count) => (
+                  <option key={count} value={count}>
+                    {count} players
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => onStartLocal(welcomePlayerCount)}>
+                Start table <span aria-hidden="true">→</span>
+              </button>
+            </div>
+            {hasSavedGame ? (
+              <button type="button" className="resume-button" onClick={onResume}>
+                <span>Resume saved table</span>
+                <small>{savedPlayerCount} players · saved on this device</small>
+              </button>
+            ) : (
+              <button type="button" className="resume-button" onClick={onPlayOnline}>
+                <span>Create or join a room</span>
+                <small>Invite friends with a private link</small>
+              </button>
+            )}
+          </div>
+
+          <dl className="welcome-facts">
+            <div>
+              <dt>Players</dt>
+              <dd>2–5</dd>
+            </div>
+            <div>
+              <dt>Play time</dt>
+              <dd>20–35 min</dd>
+            </div>
+            <div>
+              <dt>Communication</dt>
+              <dd>Limited clues</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="welcome-visual" aria-label="A preview of the Shapes card table">
+          <div className="hero-orbit orbit-one" aria-hidden="true" />
+          <div className="hero-orbit orbit-two" aria-hidden="true" />
+          <div className="hero-table">
+            <div className="hero-table-label">
+              <span>Shared blueprint</span>
+              <strong>03 / 25</strong>
+            </div>
+            <div className="hero-card-fan">
+              {previewCards.map((card) => (
+                <div className={`hero-preview-card hero-${card.shape}`} key={card.id}>
+                  <CardFace card={card} />
+                </div>
+              ))}
+              <div className="hero-hidden-card">
+                <div className="card-back-pattern" aria-label="Your hidden card">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <small>Your card</small>
+              </div>
+            </div>
+            <div className="hero-blueprint">
+              <span className="hero-blueprint-name"><i /> Circle</span>
+              {[1, 2, 3, 4, 5].map((rank) => (
+                <b key={rank} className={rank <= 2 ? "complete" : ""}>{rank}</b>
+              ))}
+            </div>
+            <div className="hero-clue">
+              <span className="hero-clue-token" aria-hidden="true">i</span>
+              <p><strong>Insight given</strong><small>These two cards are circles.</small></p>
+            </div>
+          </div>
+          <p className="hero-caption"><span aria-hidden="true">✦</span> Every clue changes what the table knows.</p>
+        </div>
+      </section>
+
+      <section className="welcome-how" aria-labelledby="welcome-how-title">
+        <div>
+          <p className="welcome-eyebrow">Designed for the table</p>
+          <h2 id="welcome-how-title">Simple rules. Delicious decisions.</h2>
+        </div>
+        <ol>
+          <li><span>01</span><strong>Give one exact clue</strong><p>Point out every matching shape, rank, or pattern in a teammate’s hand.</p></li>
+          <li><span>02</span><strong>Play what you cannot see</strong><p>Use the table’s shared memory to place the next rank in a blueprint.</p></li>
+          <li><span>03</span><strong>Finish before it cracks</strong><p>Complete all five forms while managing limited Insight and only three mistakes.</p></li>
+        </ol>
+      </section>
+    </div>
   );
 }
 

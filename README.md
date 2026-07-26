@@ -10,6 +10,9 @@ Cooperative hidden-hand deduction card game prototype.
 - Objective cards and scoring.
 - Local browser persistence.
 - Multiplayer room server with redacted player views, room version checks, SSE updates, and JSON-file room persistence.
+- Public welcome experience with local, resume, and online entry paths.
+- Responsive table UI with sound, action feedback, rules, and accessible controls.
+- Repeatable balance simulations across 2–5 players.
 
 ## Commands
 
@@ -17,8 +20,11 @@ Cooperative hidden-hand deduction card game prototype.
 npm install
 npm run test
 npm run build
+npm run simulate
 npm run dev
 ```
+
+`npm run simulate` runs 2,000 deterministic games using chaos/fuzz and perfect-information strategies. It verifies that every supported player count finishes cleanly and prints score, turn, completion, and Crack-loss ranges for balance review.
 
 Run the server after building:
 

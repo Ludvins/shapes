@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm --workspace apps/web run dev",
     "build": "npm --workspace packages/game-engine run build && npm --workspace apps/server run build && npm --workspace apps/web run build",
+    "simulate": "npm --workspace packages/game-engine run simulate",
     "serve:dist": "node scripts/serve-dist.mjs",
     "test": "npm --workspaces --if-present run test",
     "test:e2e": "npm run build && node scripts/e2e.mjs",
