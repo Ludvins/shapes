@@ -255,6 +255,32 @@ describe("Shapes game engine", () => {
     expect(updated.events.length).toBeGreaterThan(started.events.length);
   });
 
+  it("keeps a coded lobby waiting until every expected seat is filled", () => {
+    const created = createRoom({
+      hostName: "Ada",
+      expectedPlayerCount: 3,
+      seed: "three-seat-lobby",
+      now: "2026-05-22T10:00:00.000Z"
+    });
+    const withSecondPlayer = joinRoom(created, {
+      playerName: "Ben",
+      now: "2026-05-22T10:01:00.000Z"
+    });
+
+    expect(created.expectedPlayerCount).toBe(3);
+    expect(getRoomClientView(withSecondPlayer, withSecondPlayer.players[0].id).expectedPlayerCount).toBe(3);
+    expect(() => startRoomGame(withSecondPlayer, { hostPlayerId: withSecondPlayer.hostPlayerId })).toThrow(
+      "Waiting for 1 more player"
+    );
+
+    const fullLobby = joinRoom(withSecondPlayer, {
+      playerName: "Cleo",
+      now: "2026-05-22T10:02:00.000Z"
+    });
+    expect(startRoomGame(fullLobby, { hostPlayerId: fullLobby.hostPlayerId }).status).toBe("active");
+    expect(() => joinRoom(fullLobby, { playerName: "Dina" })).toThrow("lobby");
+  });
+
   it("supports a complete local playthrough from first clue to game over", () => {
     let state = createGame({ playerNames: ["Ada", "Ben", "Cleo"], seed: "complete-playthrough" }).state;
     const random = createRandom("complete-playthrough-actions");

@@ -196,6 +196,7 @@ export interface RoomState {
   seed: string;
   status: RoomStatus;
   hostPlayerId: string;
+  expectedPlayerCount: number;
   players: RoomPlayer[];
   gameState: GameState | null;
   events: GameEvent[];
@@ -211,6 +212,7 @@ export interface RoomClientView {
   seed: string;
   status: RoomStatus;
   hostPlayerId: string;
+  expectedPlayerCount: number;
   players: RoomPlayer[];
   gameView: PlayerView | null;
   events: GameEvent[];
@@ -222,6 +224,7 @@ export interface RoomClientView {
 
 export interface CreateRoomOptions {
   hostName: string;
+  expectedPlayerCount?: number;
   seed?: string;
   now?: string;
 }

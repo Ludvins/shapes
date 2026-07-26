@@ -380,6 +380,7 @@ export function App() {
   );
   const [serverUrl, setServerUrl] = useState(inviteParams?.serverUrl ?? DEFAULT_SERVER_URL);
   const [onlineName, setOnlineName] = useState("Ada");
+  const [onlineExpectedPlayerCount, setOnlineExpectedPlayerCount] = useState(3);
   const [onlineJoinRoomId, setOnlineJoinRoomId] = useState(inviteParams?.roomId ?? "");
   const [onlineRoom, setOnlineRoom] = useState<RoomClientView | null>(null);
   const [onlinePlayerId, setOnlinePlayerId] = useState("");
@@ -626,6 +627,7 @@ export function App() {
     try {
       const room = await createOnlineRoom(serverUrl, {
         hostName: onlineName.trim() || "Player",
+        expectedPlayerCount: onlineExpectedPlayerCount,
         seed: seed.trim() || undefined
       });
       setOnlineRoom(room);
@@ -873,10 +875,12 @@ export function App() {
         <OnlineRoomSetup
           serverUrl={serverUrl}
           onlineName={onlineName}
+          expectedPlayerCount={onlineExpectedPlayerCount}
           roomId={onlineJoinRoomId}
           busy={onlineBusy}
           onServerUrlChange={setServerUrl}
           onOnlineNameChange={setOnlineName}
+          onExpectedPlayerCountChange={setOnlineExpectedPlayerCount}
           onRoomIdChange={setOnlineJoinRoomId}
           onCreate={() => void createRoom()}
           onJoin={() => void joinRoom()}
@@ -1143,54 +1147,120 @@ function WelcomeScreen({
 function OnlineRoomSetup({
   serverUrl,
   onlineName,
+  expectedPlayerCount,
   roomId,
   busy,
   onServerUrlChange,
   onOnlineNameChange,
+  onExpectedPlayerCountChange,
   onRoomIdChange,
   onCreate,
   onJoin
 }: {
   serverUrl: string;
   onlineName: string;
+  expectedPlayerCount: number;
   roomId: string;
   busy: OnlineBusyState;
   onServerUrlChange: (serverUrl: string) => void;
   onOnlineNameChange: (name: string) => void;
+  onExpectedPlayerCountChange: (playerCount: number) => void;
   onRoomIdChange: (roomId: string) => void;
   onCreate: () => void;
   onJoin: () => void;
 }) {
   const isBusy = busy !== "idle";
+  const normalizedCode = roomId.trim().toUpperCase();
 
   return (
-    <section className="online-panel">
-      <div>
-        <h2>Online Room</h2>
-        <p className="muted">Create or join with a room id.</p>
+    <section className="online-panel online-entry-panel">
+      <div className="online-entry-heading">
+        <span className="online-live-pill"><i /> Live multiplayer</span>
+        <h2>Bring everyone to the table.</h2>
+        <p>Choose your name, then create a private lobby or join one with its code.</p>
       </div>
-      <div className="online-actions server-actions">
+
+      <div className="online-identity">
+        <label>
+          <span>Name</span>
+          <input
+            value={onlineName}
+            onChange={(event) => onOnlineNameChange(event.target.value)}
+            placeholder="How should the table know you?"
+            autoComplete="nickname"
+            maxLength={24}
+          />
+        </label>
+        <div className="identity-preview" aria-label={`You will join as ${onlineName.trim() || "Player"}`}>
+          <span>{(onlineName.trim() || "P").charAt(0).toUpperCase()}</span>
+          <div><small>Joining as</small><strong>{onlineName.trim() || "Player"}</strong></div>
+        </div>
+      </div>
+
+      <div className="online-paths">
+        <article className="online-path-card create-path">
+          <span className="path-number">01</span>
+          <div>
+            <p className="path-kicker">Start a new table</p>
+            <h3>Create a lobby</h3>
+            <p>Pick the table size. We’ll make a short code for your friends.</p>
+          </div>
+          <label>
+            Seats
+            <select
+              value={expectedPlayerCount}
+              onChange={(event) => onExpectedPlayerCountChange(Number(event.target.value))}
+            >
+              {[2, 3, 4, 5].map((count) => (
+                <option key={count} value={count}>{count} players</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={onCreate} disabled={isBusy || onlineName.trim().length === 0}>
+            {busy === "creating" ? "Creating lobby..." : "Create lobby"}
+          </button>
+        </article>
+
+        <div className="online-or" aria-hidden="true"><span>or</span></div>
+
+        <article className={normalizedCode ? "online-path-card join-path has-code" : "online-path-card join-path"}>
+          <span className="path-number">02</span>
+          <div>
+            <p className="path-kicker">Have an invite?</p>
+            <h3>Join with a code</h3>
+            <p>Enter the code from your host and take your seat instantly.</p>
+          </div>
+          <label>
+            Lobby code
+            <input
+              className="lobby-code-input"
+              value={roomId}
+              onChange={(event) => onRoomIdChange(event.target.value.toUpperCase())}
+              placeholder="HEX-154"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={16}
+            />
+          </label>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onJoin}
+            disabled={isBusy || onlineName.trim().length === 0 || normalizedCode.length === 0}
+          >
+            {busy === "joining" ? "Joining lobby..." : "Join lobby"}
+          </button>
+        </article>
+      </div>
+
+      <details className="server-settings">
+        <summary>Connection settings</summary>
         <label>
           Server
           <input value={serverUrl} onChange={(event) => onServerUrlChange(event.target.value)} />
         </label>
-        <label>
-          Name
-          <input value={onlineName} onChange={(event) => onOnlineNameChange(event.target.value)} />
-        </label>
-      </div>
-      <div className="online-actions">
-        <button type="button" onClick={onCreate} disabled={isBusy}>
-          {busy === "creating" ? "Creating..." : "Create room"}
-        </button>
-        <label>
-          Room id
-          <input value={roomId} onChange={(event) => onRoomIdChange(event.target.value)} />
-        </label>
-        <button type="button" className="secondary-button" onClick={onJoin} disabled={isBusy || roomId.trim().length === 0}>
-          {busy === "joining" ? "Joining..." : "Join room"}
-        </button>
-      </div>
+      </details>
     </section>
   );
 }
@@ -1211,10 +1281,14 @@ function OnlineLobby({
   const isHost = room.hostPlayerId === playerId;
   const [copied, setCopied] = useState(false);
   const inviteLink = buildInviteLink(serverUrl, room.code);
+  const missingPlayers = Math.max(0, room.expectedPlayerCount - room.players.length);
+  const everyoneIsHere = missingPlayers === 0;
+  const host = room.players.find((player) => player.id === room.hostPlayerId);
+  const lobbySlots = Array.from({ length: room.expectedPlayerCount }, (_, index) => room.players[index] ?? null);
 
-  async function copyInviteLink() {
+  async function copyInvite(value: string) {
     try {
-      await navigator.clipboard.writeText(inviteLink);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -1223,31 +1297,71 @@ function OnlineLobby({
   }
 
   return (
-    <section className="online-panel">
-      <div>
-        <h2>Lobby {room.code}</h2>
-        <p className="muted">Room id: {room.id}</p>
+    <section className="online-panel online-lobby">
+      <div className="lobby-hero">
+        <div>
+          <span className={everyoneIsHere ? "lobby-state ready" : "lobby-state"}>
+            <i /> {everyoneIsHere ? "Everyone’s here" : "Waiting for everyone"}
+          </span>
+          <h2>Your lobby is ready.</h2>
+          <p>
+            {everyoneIsHere
+              ? isHost
+                ? "All seats are filled. Start whenever your table is ready."
+                : `All seats are filled. Waiting for ${host?.name ?? "the host"} to start.`
+              : `Share this code. ${missingPlayers} more ${missingPlayers === 1 ? "player" : "players"} needed.`}
+          </p>
+        </div>
+        <div className="lobby-code-card">
+          <span>Lobby code</span>
+          <strong>{room.code}</strong>
+          <button type="button" onClick={() => void copyInvite(room.code)}>
+            {copied ? "Copied!" : "Copy code"}
+          </button>
+        </div>
       </div>
-      <div className="invite-link-row">
-        <label>
-          Invite link
-          <input value={inviteLink} readOnly />
-        </label>
-        <button type="button" className="secondary-button" onClick={() => void copyInviteLink()}>
-          {copied ? "Copied" : "Copy"}
-        </button>
+
+      <div className="lobby-progress" aria-label={`${room.players.length} of ${room.expectedPlayerCount} seats filled`}>
+        <div><span>Table progress</span><strong>{room.players.length} / {room.expectedPlayerCount} seated</strong></div>
+        <span className="lobby-progress-track"><i style={{ width: `${(room.players.length / room.expectedPlayerCount) * 100}%` }} /></span>
       </div>
-      <ul className="lobby-list">
-        {room.players.map((player) => (
-          <li key={player.id}>
-            <strong>{player.name}</strong>
-            <span>{player.id === room.hostPlayerId ? "Host" : "Player"}</span>
+
+      <ul className="lobby-list" aria-label="Lobby seats">
+        {lobbySlots.map((player, index) => (
+          <li className={player ? "lobby-seat occupied" : "lobby-seat empty"} key={player?.id ?? `empty-${index}`}>
+            <span className="lobby-avatar">{player ? player.name.charAt(0).toUpperCase() : index + 1}</span>
+            <div>
+              <strong>{player?.name ?? "Waiting for player"}</strong>
+              <small>
+                {player
+                  ? player.id === room.hostPlayerId
+                    ? "Host"
+                    : player.id === playerId
+                      ? "You"
+                      : "Connected"
+                  : "Open seat"}
+              </small>
+            </div>
+            <span className={player ? "seat-status connected" : "seat-status"}>{player ? "Ready" : "Waiting"}</span>
           </li>
         ))}
       </ul>
-      <button type="button" disabled={!isHost || room.players.length < 2 || busy !== "idle"} onClick={onStart}>
-        {busy === "starting" ? "Starting..." : "Start game"}
-      </button>
+
+      <div className="lobby-footer">
+        <button type="button" className="secondary-button invite-link-button" onClick={() => void copyInvite(inviteLink)}>
+          {copied ? "Invite copied!" : "Copy invite link"}
+        </button>
+        {isHost ? (
+          <button type="button" disabled={!everyoneIsHere || busy !== "idle"} onClick={onStart}>
+            {busy === "starting" ? "Starting game..." : everyoneIsHere ? "Start the game" : `Waiting for ${missingPlayers}`}
+          </button>
+        ) : (
+          <div className="guest-waiting">
+            <span className="waiting-dots"><i /><i /><i /></span>
+            <div><strong>{everyoneIsHere ? "Waiting for the host" : "Waiting for everyone"}</strong><small>This screen updates automatically.</small></div>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

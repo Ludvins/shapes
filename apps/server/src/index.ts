@@ -89,7 +89,11 @@ function loadRooms(): void {
   }
 
   const parsed = JSON.parse(readFileSync(roomsFile, "utf8")) as RoomState[];
-  parsed.forEach((room) => rooms.set(room.id, room));
+  parsed.forEach((room) => {
+    const playerCount = room.gameState?.players.length ?? room.players.length;
+    room.expectedPlayerCount = Math.min(5, Math.max(2, Number(room.expectedPlayerCount) || playerCount));
+    rooms.set(room.id, room);
+  });
 }
 
 function persistRooms(): void {
@@ -181,8 +185,12 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
   }
 
   if (request.method === "POST" && url.pathname === "/rooms") {
-    const body = await readJson<{ hostName?: string; seed?: string }>(request);
-    const room = createRoom({ hostName: body.hostName ?? "", seed: body.seed });
+    const body = await readJson<{ hostName?: string; expectedPlayerCount?: number; seed?: string }>(request);
+    const room = createRoom({
+      hostName: body.hostName ?? "",
+      expectedPlayerCount: body.expectedPlayerCount,
+      seed: body.seed
+    });
     sendJson(response, 201, getRoomClientView(storeRoom(room), room.hostPlayerId));
     return;
   }

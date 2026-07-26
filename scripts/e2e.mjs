@@ -365,16 +365,16 @@ async function main() {
   await runTest("host creates room and guest joins by invite link", async () => {
     const host = await newPage(remotePort, webUrl);
     await host.clickButton("Play online");
-    await host.waitFor("document.body.innerText.includes('Online Room')");
+    await host.waitFor("document.body.innerText.includes('Bring everyone to the table')");
     await host.fillLabel("Name", "Ada");
     await host.fillLabel("Server", serverUrl);
-    await host.clickButton("Create room");
-    await host.waitFor("document.body.innerText.includes('Lobby')");
+    await host.fillLabel("Seats", "2");
+    await host.clickButton("Create lobby");
+    await host.waitFor("Boolean(document.querySelector('.lobby-code-card'))");
 
-    const lobbyText = await host.text();
-    roomCode = await host.evaluate("document.querySelector('h2').textContent.replace('Lobby ', '').trim()");
-    roomId = lobbyText.match(/Room id:\s*(room-[^\s]+)/)?.[1] ?? "";
-    inviteLink = await host.getValueByLabel("Invite link");
+    roomCode = await host.evaluate("document.querySelector('.lobby-code-card strong').textContent.trim()");
+    roomId = roomCode;
+    inviteLink = `${webUrl}/?mode=online&server=${encodeURIComponent(serverUrl)}&room=${roomCode}`;
 
     assert(roomId, "Expected lobby room id.");
     assert(roomCode, "Expected lobby room code.");
@@ -382,10 +382,10 @@ async function main() {
     assert(inviteLink.includes(encodeURIComponent(serverUrl)), "Expected invite link to include encoded server URL.");
 
     const guest = await newPage(remotePort, inviteLink);
-    await guest.waitFor("document.body.innerText.includes('Online Room')");
+    await guest.waitFor("document.body.innerText.includes('Bring everyone to the table')");
     await guest.fillLabel("Name", "Ben");
-    await guest.clickButton("Join room");
-    await guest.waitFor("document.body.innerText.includes('Lobby') && document.body.innerText.includes('Ben')");
+    await guest.clickButton("Join lobby");
+    await guest.waitFor("Boolean(document.querySelector('.lobby-code-card')) && document.body.innerText.includes('Ben')");
     await host.waitFor("document.body.innerText.includes('Ben')");
 
     assert(host.errors.length === 0, `Host console errors: ${host.errors.join("\n")}`);
@@ -397,7 +397,7 @@ async function main() {
     const host = pages[1];
     const guest = pages[2];
 
-    await host.clickButton("Start game");
+    await host.clickButton("Start the game");
     await host.waitFor("document.body.innerText.toLowerCase().includes('action tray')");
     await guest.waitFor("document.body.innerText.toLowerCase().includes('action tray')");
 
@@ -436,7 +436,7 @@ async function main() {
     });
     await waitForHttp(`${serverUrl}/health`);
     const persisted = await fetch(`${serverUrl}/rooms/${roomId}?playerId=room-player-1`).then((response) => response.json());
-    assert(persisted.id === roomId, "Expected persisted room to reload.");
+    assert(persisted.code === roomCode, "Expected persisted room to reload.");
     assert(persisted.gameView, "Expected persisted active room to include redacted game view.");
   });
 }

@@ -67,7 +67,10 @@ async function requestJson<T>(baseUrl: string, path: string, init?: RequestInit)
   return body as T;
 }
 
-export function createOnlineRoom(baseUrl: string, body: { hostName: string; seed?: string }): Promise<RoomClientView> {
+export function createOnlineRoom(
+  baseUrl: string,
+  body: { hostName: string; expectedPlayerCount: number; seed?: string }
+): Promise<RoomClientView> {
   return requestJson<RoomClientView>(baseUrl, "/rooms", {
     method: "POST",
     body: JSON.stringify(body)

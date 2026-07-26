@@ -12,6 +12,8 @@ import type {
 } from "./types.js";
 
 const ROOM_WORDS = ["CIRCLE", "STAR", "HEX", "FORM", "LINE", "ARC", "GRID", "DOT"];
+const MIN_ROOM_PLAYERS = 2;
+const MAX_ROOM_PLAYERS = 5;
 
 function cloneRoom(room: RoomState): RoomState {
   return JSON.parse(JSON.stringify(room)) as RoomState;
@@ -35,6 +37,14 @@ function createRoomPlayer(name: string, index: number, now: string): RoomPlayer 
   };
 }
 
+function expectedPlayerCount(room: Pick<RoomState, "expectedPlayerCount" | "players">): number {
+  const requested = Number(room.expectedPlayerCount);
+  if (Number.isInteger(requested) && requested >= MIN_ROOM_PLAYERS && requested <= MAX_ROOM_PLAYERS) {
+    return requested;
+  }
+  return Math.min(MAX_ROOM_PLAYERS, Math.max(MIN_ROOM_PLAYERS, room.players.length));
+}
+
 export function createRoom(options: CreateRoomOptions): RoomState {
   const hostName = options.hostName.trim();
 
@@ -45,6 +55,11 @@ export function createRoom(options: CreateRoomOptions): RoomState {
   const now = options.now ?? new Date().toISOString();
   const seed = options.seed?.trim() || `room-${now}`;
   const host = createRoomPlayer(hostName, 0, now);
+  const playerCount = options.expectedPlayerCount ?? MIN_ROOM_PLAYERS;
+
+  if (!Number.isInteger(playerCount) || playerCount < MIN_ROOM_PLAYERS || playerCount > MAX_ROOM_PLAYERS) {
+    throw new Error(`Shapes lobbies support ${MIN_ROOM_PLAYERS} to ${MAX_ROOM_PLAYERS} players.`);
+  }
 
   return {
     id: `room-${seed.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
@@ -53,6 +68,7 @@ export function createRoom(options: CreateRoomOptions): RoomState {
     seed,
     status: "lobby",
     hostPlayerId: host.id,
+    expectedPlayerCount: playerCount,
     players: [host],
     gameState: null,
     events: [],
@@ -74,8 +90,11 @@ export function joinRoom(previousRoom: RoomState, options: JoinRoomOptions): Roo
     throw new Error("A player name is required.");
   }
 
-  if (room.players.length >= 5) {
-    throw new Error("Shapes rooms support up to 5 players.");
+  const capacity = expectedPlayerCount(room);
+  room.expectedPlayerCount = capacity;
+
+  if (room.players.length >= capacity) {
+    throw new Error("This lobby is full.");
   }
 
   if (room.players.some((player) => player.name.toLowerCase() === playerName.toLowerCase())) {
@@ -103,6 +122,14 @@ export function startRoomGame(previousRoom: RoomState, options: StartRoomGameOpt
 
   if (room.players.length < 2) {
     throw new Error("At least 2 players are required.");
+  }
+
+  const capacity = expectedPlayerCount(room);
+  room.expectedPlayerCount = capacity;
+
+  if (room.players.length < capacity) {
+    const missingPlayers = capacity - room.players.length;
+    throw new Error(`Waiting for ${missingPlayers} more ${missingPlayers === 1 ? "player" : "players"}.`);
   }
 
   const result = createGame({
@@ -177,6 +204,7 @@ export function getRoomClientView(room: RoomState, roomPlayerId: string | null =
     seed: room.seed,
     status: room.status,
     hostPlayerId: room.hostPlayerId,
+    expectedPlayerCount: expectedPlayerCount(room),
     players: room.players,
     gameView,
     events: room.events,
